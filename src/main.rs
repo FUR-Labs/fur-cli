@@ -1,8 +1,10 @@
 mod commands;
+pub mod utils;
 
 use clap::{Parser, Subcommand};
-use crate::commands::{/* new, */ scribe::ScribeArgs, scribe, timeline, fork};
+use crate::commands::{/* new, */ jot::JotArgs, jot, timeline, fork};
 use crate::commands::{jump, JumpArgs};
+use crate::commands::{status, tree};
 
 #[derive(Parser)]
 #[command(name = "fur")]
@@ -17,6 +19,9 @@ enum Commands {
     /// Start a new conversation
     New,
 
+    /// Show current thread/message state
+    Status {},
+
     /// Fork an existing thread
     Fork {
         #[arg(short, long, default_value = "")]
@@ -27,10 +32,13 @@ enum Commands {
     Jump(JumpArgs),
 
     /// Add message to current thread
-    Scribe(ScribeArgs),
+    Jot(JotArgs),
 
     /// Show thread timeline
     Timeline {},
+
+    /// Show tree of message ancestry & children
+    Tree {},
 
     /// Embed a compressed summary (like a frostmark)
     Frostmark {},
@@ -48,6 +56,8 @@ fn main() {
     match cli.command {
         Commands::New => commands::new::run_new(),
 
+        Commands::Status {} => status::run_status(),
+
         Commands::Fork { id } => {
             if id.is_empty() {
                 fork::run_fork_from_active()
@@ -62,9 +72,11 @@ fn main() {
             }
         }
 
-        Commands::Scribe(args) => scribe::run_scribe(args),
+        Commands::Jot(args) => jot::run_jot(args),
 
         Commands::Timeline {} => timeline::run_timeline(),
+
+        Commands::Tree {} => tree::run_tree(),
 
         Commands::Frostmark {} => {
             println!("Embedding frostmark...");

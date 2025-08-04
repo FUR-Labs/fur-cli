@@ -8,15 +8,19 @@ use serde_json::json;
 use serde_json::Value;
 
 #[derive(Args)]
-pub struct ScribeArgs {
+pub struct JotArgs {
     #[arg(short, long)]
     pub role: String,
 
     #[arg(short, long)]
     pub text: String,
+
+    #[arg(long)]
+    pub md: Option<String>, // Name of the markdown file to link
 }
 
-pub fn run_scribe(args: ScribeArgs) {
+
+pub fn run_jot(args: JotArgs) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
 
@@ -75,10 +79,29 @@ pub fn run_scribe(args: ScribeArgs) {
         .write_all(thread_data.to_string().as_bytes())
         .unwrap();
 
-    println!("✍️ Scribed message to thread {}: {}", &thread_id[..8], &message_id[..8]);
+    println!("✍️ Message jotted down to thread {}: {}", &thread_id[..8], &message_id[..8]);
 
     // Update index.json with new current_message
     let mut index_data: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
     index_data["current_message"] = Value::String(message_id.clone());
     fs::write(index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
+
+    // Update parent message with new child
+    if parent_id != "null" {
+        let parent_path = fur_dir.join("messages").join(format!("{}.json", parent_id));
+        if let Ok(parent_content) = fs::read_to_string(&parent_path) {
+            if let Ok(mut parent_json) = serde_json::from_str::<Value>(&parent_content) {
+                if !parent_json.get("children").is_some() {
+                    parent_json["children"] = json!([]);
+                }
+
+                if let Some(children) = parent_json["children"].as_array_mut() {
+                    children.push(Value::String(message_id.clone()));
+                }
+                fs::write(&parent_path, serde_json::to_string_pretty(&parent_json).unwrap()).unwrap();
+            }
+        }
+    }
+
+
 }
