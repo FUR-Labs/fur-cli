@@ -3,9 +3,12 @@ name = "fur-cli"
 version = "0.1.0"
 edition = "2021"
 authors = ["Andrew Garcia"]
-description = "CLI tool for recursive semantic memory versioning and chat thread forking. It's like git, but furrier."
+description = "FUR — a forkable, unearthable, recursive memory tracker for your local chat logs"
 license = "MIT"
+readme = "README.md"
 repository = "https://github.com/andrewrgarcia/fur-cli"
+keywords = ["cli", "notes", "ai", "chat", "versioning"]
+categories = ["command-line-utilities"]
 
 [[bin]]
 name = "fur"
