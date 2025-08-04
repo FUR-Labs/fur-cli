@@ -1,7 +1,12 @@
+mod commands;
+
 use clap::{Parser, Subcommand};
+use crate::commands::{/* new, */ scribe::ScribeArgs, scribe, timeline, fork};
+use crate::commands::{jump, JumpArgs};
 
 #[derive(Parser)]
-#[command(name = "fur", version = "0.1", author = "You", about = "Recursive chat versioning tool")]
+#[command(name = "fur")]
+#[command(about = "FUR — Forkable, Unearthable, Recursive memory tracker")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -10,22 +15,19 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Start a new conversation
-    New {
-        #[arg(short, long)]
-        title: Option<String>,
-    },
+    New,
 
     /// Fork an existing thread
     Fork {
-        #[arg(short, long)]
+        #[arg(short, long, default_value = "")]
         id: String,
     },
 
+    /// Jump to another message (past, child, or ID)
+    Jump(JumpArgs),
+
     /// Add message to current thread
-    Scribe {
-        #[arg(short, long)]
-        message: String,
-    },
+    Scribe(ScribeArgs),
 
     /// Show thread timeline
     Timeline {},
@@ -44,18 +46,26 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::New { title } => {
-            println!("Starting new thread: {:?}", title.unwrap_or_else(|| "untitled".into()));
-        }
+        Commands::New => commands::new::run_new(),
+
         Commands::Fork { id } => {
-            println!("Forking thread ID: {}", id);
+            if id.is_empty() {
+                fork::run_fork_from_active()
+            } else {
+                fork::run_fork(&id)
+            }
         }
-        Commands::Scribe { message } => {
-            println!("Appending message: {}", message);
+
+        Commands::Jump(args) => {
+            if let Err(e) = jump::run_jump(args) {
+                eprintln!("Error: {}", e);
+            }
         }
-        Commands::Timeline {} => {
-            println!("Displaying thread timeline...");
-        }
+
+        Commands::Scribe(args) => scribe::run_scribe(args),
+
+        Commands::Timeline {} => timeline::run_timeline(),
+
         Commands::Frostmark {} => {
             println!("Embedding frostmark...");
         }
