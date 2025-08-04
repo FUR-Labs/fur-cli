@@ -1,6 +1,6 @@
 <!-- LOGO -->
 <p align="center">
-  <img src="https://your-logo-url-or-relative-path.png" width="120" alt="fur logo"/>
+  <img src="https://github.com/user-attachments/assets/c3582cb8-c1cc-41ab-9ed1-f8fbde4d8c21" width="200" alt="fur logo"/>
 </p>
 
 <h1 align="center">FUR 🐾</h1>
