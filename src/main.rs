@@ -15,8 +15,11 @@ use crate::commands::{
 };
 
 #[derive(Parser)]
-#[command(name = "fur")]
-#[command(about = "FUR — Forkable, Unearthable, Recursive memory tracker")]
+#[command(
+    name = "fur",
+    about = "FUR — Forkable, Unearthable, Recursive memory tracker",
+    long_about = "Track, branch, and link your conversations, especially AI chats, using local files and JSON. Think of it like git for your ideas."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -30,22 +33,27 @@ enum Commands {
     /// Show current thread/message state
     Status {},
 
-    /// Fork an existing thread
+    /// Fork the current message into a new thread
     Fork {
+        /// ID of the message to fork from (optional)
         #[arg(short, long, default_value = "")]
         id: String,
     },
 
-    /// Jump to another message (past, child, or ID)
+    /// Jump to another message in the thread
+    ///
+    /// You can go back (past), forward (child), or jump to a specific ID.
     Jump(JumpArgs),
 
-    /// Add message to current thread
+    /// Add a new message or link a markdown file
+    ///
+    /// Use `--file` to attach a markdown document.
     Jot(JotArgs),
 
-    /// Show thread timeline
+    /// Show the thread as a linear timeline
     Timeline {},
 
-    /// Print full tree of current thread
+    /// Show the thread as a branching tree
     Tree {},
 
     /// Print full contents of a markdown-linked message
