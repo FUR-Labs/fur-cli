@@ -43,7 +43,7 @@ pub fn run_timeline() {
         let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id_str));
         if let Ok(msg_content) = fs::read_to_string(&msg_path) {
             if let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) {
-                let time = msg_json["created_at"].as_str().unwrap_or("???");
+                let time = msg_json["timestamp"].as_str().unwrap_or("???");
                 let role = msg_json["role"].as_str().unwrap_or("unknown");
                 let text = msg_json["text"].as_str().unwrap_or("???");
 

@@ -77,10 +77,20 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     // Handle jump --child
     if let Some(n) = args.child {
-        let empty_vec = vec![];
-        let children = current["children"].as_array().unwrap_or(&empty_vec);
+        let current_id = current["id"].as_str().unwrap_or_default();
 
-        if let Some(Value::String(child_id)) = children.get(n) {
+        let children: Vec<String> = messages.iter().filter_map(|msg_id| {
+            let msg_path = Path::new(".fur/messages").join(format!("{}.json", msg_id.as_str()?));
+            let msg_data = fs::read_to_string(msg_path).ok()?;
+            let msg_json: Value = serde_json::from_str(&msg_data).ok()?;
+            if msg_json["parent"].as_str()? == current_id {
+                Some(msg_json["id"].as_str()?.to_string())
+            } else {
+                None
+            }
+        }).collect();
+
+        if let Some(child_id) = children.get(n) {
             index["current_message"] = Value::String(child_id.to_string());
             fs::write(index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
             println!("⏩ Jumped to child [{}]: {}", n, child_id);
@@ -89,6 +99,7 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("❌ No such child at index {}", n);
             return Ok(());
         }
+
     }
 
     // Handle jump --id

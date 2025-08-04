@@ -46,27 +46,12 @@ pub fn run_scribe(args: ScribeArgs) {
         "role": args.role,
         "text": args.text,
         "timestamp": timestamp,
-        "parent": if parent_id == "null" { Value::Null } else { Value::String(parent_id.to_string()) },
-        "children": []
-    });
-
-    if let Some(parent_id) = index_data["current_message"].as_str() {
-        let thread_path = Path::new(".fur").join("threads").join(format!("{}.json", thread_id));
-        let mut thread_data: Value = serde_json::from_str(&fs::read_to_string(&thread_path).unwrap()).unwrap();
-        let messages = thread_data["messages"].as_array_mut().unwrap();
-
-        for m in messages.iter_mut() {
-            if m["id"] == parent_id {
-                if let Some(children) = m["children"].as_array_mut() {
-                    children.push(Value::String(message_id.to_string()));
-                }
-                break;
-            }
+        "parent": if parent_id == "null" {
+            Value::Null
+        } else {
+            Value::String(parent_id.to_string())
         }
-
-        // Write updated thread with children ref
-        fs::write(thread_path, serde_json::to_string_pretty(&thread_data).unwrap()).unwrap();
-    }
+    });
 
 
     let message_path = fur_dir
