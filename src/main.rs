@@ -1,10 +1,18 @@
 mod commands;
-pub mod utils;
+mod utils;
 
 use clap::{Parser, Subcommand};
-use crate::commands::{/* new, */ jot::JotArgs, jot, timeline, fork};
-use crate::commands::{jump, JumpArgs};
-use crate::commands::{status, tree};
+use crate::commands::{
+    jot::JotArgs,
+    jot,
+    jump::{self, JumpArgs},
+    timeline,
+    fork,
+    status,
+    tree,
+    cat::CatArgs,
+    cat,
+};
 
 #[derive(Parser)]
 #[command(name = "fur")]
@@ -37,17 +45,11 @@ enum Commands {
     /// Show thread timeline
     Timeline {},
 
-    /// Show tree of message ancestry & children
+    /// Print full tree of current thread
     Tree {},
 
-    /// Embed a compressed summary (like a frostmark)
-    Frostmark {},
-
-    /// Unearth a sacrificed thread
-    Unearth {
-        #[arg(short, long)]
-        id: String,
-    },
+    /// Print full contents of a markdown-linked message
+    Cat(CatArgs),
 }
 
 fn main() {
@@ -78,11 +80,6 @@ fn main() {
 
         Commands::Tree {} => tree::run_tree(),
 
-        Commands::Frostmark {} => {
-            println!("Embedding frostmark...");
-        }
-        Commands::Unearth { id } => {
-            println!("Unearthing fork ID: {}", id);
-        }
+        Commands::Cat(args) => cat::run_cat(args),
     }
 }
