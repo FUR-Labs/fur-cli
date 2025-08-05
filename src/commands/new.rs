@@ -5,7 +5,8 @@ use uuid::Uuid;
 use chrono::Utc;
 use serde_json::json;
 
-pub fn run_new() {
+/// Creates a new thread with a user-provided name.
+pub fn run_new(name: String) {
     let fur_dir = Path::new(".fur");
 
     // Create .fur/ directory if it doesn't exist
@@ -36,7 +37,7 @@ pub fn run_new() {
         "created_at": now,
         "messages": [],
         "tags": [],
-        "title": format!("Thread {}", &thread_id[..8]),
+        "title": name,  // 👈 custom name instead of auto title
     });
 
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
@@ -55,11 +56,12 @@ pub fn run_new() {
         .unwrap()
         .push(thread_id.clone().into());
     index_data["active_thread"] = thread_id.clone().into();
+    index_data["current_message"] = serde_json::Value::Null;
 
     let mut index_file = File::create(index_path).unwrap();
     index_file
         .write_all(index_data.to_string().as_bytes())
         .unwrap();
 
-    println!("🌱 New thread created: {}", &thread_id[..8]);
+    println!("🌱 New thread created: {} — \"{}\"", &thread_id[..8], name);
 }

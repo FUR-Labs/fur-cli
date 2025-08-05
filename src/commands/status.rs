@@ -62,12 +62,22 @@ pub fn run_status() {
     for id in &lineage {
         if let Some(msg) = id_to_message.get(id) {
             let role = msg["role"].as_str().unwrap_or("???");
-            let text = msg["text"].as_str().unwrap_or("");
-            let preview = text.chars().take(24).collect::<String>();
+            let text = msg.get("text")
+                .and_then(|v| v.as_str())
+                .unwrap_or_else(|| msg.get("markdown").and_then(|v| v.as_str()).unwrap_or("<no content>"));
+
+            let preview = text.lines().next().unwrap_or("").chars().take(40).collect::<String>();
             let marker = if id == current_msg_id { "🧭 (current)" } else { "✅" };
-            println!("{} [{}] {}", preview, role, marker);
+            let id_display = &id[..8];
+
+            if msg.get("markdown").is_some() {
+                println!("{preview} [{role}] 📄 {id_display} {marker}");
+            } else {
+                println!("{preview} [{role}] {id_display} {marker}");
+            }
         }
     }
+    
 
     // Print children of current message
     println!("─────────────────────────────");
@@ -79,9 +89,19 @@ pub fn run_status() {
             if let Some(child_id) = child.as_str() {
                 if let Some(child_msg) = id_to_message.get(child_id) {
                     let role = child_msg["role"].as_str().unwrap_or("???");
-                    let text = child_msg["text"].as_str().unwrap_or("");
-                    let preview = text.chars().take(24).collect::<String>();
-                    println!("🔹 {} [{}] - {}", preview, role, child_id);
+                    let text = child_msg.get("text")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_else(|| child_msg.get("markdown").and_then(|v| v.as_str()).unwrap_or("<no content>"));
+
+                    let preview = text.lines().next().unwrap_or("").chars().take(40).collect::<String>();
+                    let id_display = &child_id[..8];
+
+                    if child_msg.get("markdown").is_some() {
+                        println!("🔹 {preview} [{role}] 📄 {id_display}");
+                    } else {
+                        println!("🔹 {preview} [{role}] {id_display}");
+                    }
+
                 }
             }
         }

@@ -52,28 +52,61 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     // Handle jump --past
     if let Some(n) = args.past {
-        let parent_id = current["parent"].as_str();
-        let mut last_id = parent_id;
+        let mut current_id = current["id"].as_str().unwrap_or_default().to_string();
+        let mut jumped = 0;
 
-        for _ in 1..n {
-            if let Some(pid) = last_id {
-                last_id = messages
-                .iter()
-                .find(|m| m["id"] == pid)
-                .ok_or("❌ Could not find parent message")?
-                .get("parent")
-                .ok_or("❌ Could not get 'parent' field")?
-                .as_str();
+        while jumped < n {
+            // println!("🔍 Loop iteration {} — current_id: {}", jumped, current_id);
+
+            let msg_path = Path::new(".fur/messages").join(format!("{}.json", current_id));
+            let msg_data = fs::read_to_string(&msg_path);
+            if msg_data.is_err() {
+                eprintln!("❌ Failed to load message: {}", current_id);
+                return Ok(());
+            }
+
+            let msg_json: Value = serde_json::from_str(&msg_data.unwrap()).unwrap();
+
+            // let parent_raw = &msg_json["parent"];
+            // println!("   ↪️ parent field raw: {}", parent_raw);
+
+            match msg_json["parent"].as_str() {
+                Some(pid) if !pid.is_empty() => {
+                    let in_thread = thread["messages"]
+                        .as_array()
+                        .unwrap_or(&vec![])
+                        .iter()
+                        .any(|val| val.as_str() == Some(pid));
+
+                    if !in_thread {
+                        println!("\x1b[91m📜 You've reached the origin of this thread. No earlier messages exist.\x1b[0m");
+                        println!("\x1b[93m🌱 To start a new conversation, run:\n    fur new \"Title of your new thread\"\x1b[0m");
+                        return Ok(());
+                    }
+
+                    // println!("   🧬 Jumping to parent_id: {}", pid);
+                    current_id = pid.to_string();
+                    jumped += 1;
+                }
+                _ => {
+                    println!("\x1b[91m📜 You've reached the origin of this thread. No earlier messages exist.\x1b[0m");
+                    println!("\x1b[93m🌱 To start a new conversation, run:\n    fur new \"Title of your new thread\"\x1b[0m");
+                    return Ok(());
+                }
             }
         }
 
-        if let Some(new_id) = last_id {
-            index["current_message"] = Value::String(new_id.to_string());
-            fs::write(index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
-            println!("⏪ Jumped back {} messages to {}", n, new_id);
-            return Ok(());
-        }
+        index["current_message"] = Value::String(current_id.clone());
+        fs::write(index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+        println!(
+            "⏪ Jumped back {} message{} to {}",
+            jumped,
+            if jumped == 1 { "" } else { "s" },
+            current_id
+        );
+        return Ok(());
     }
+
 
     // Handle jump --child
     if let Some(n) = args.child {

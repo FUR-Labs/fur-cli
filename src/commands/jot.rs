@@ -79,7 +79,7 @@ pub fn run_jot(args: JotArgs) {
     // Update index
     let mut index_data: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
     index_data["current_message"] = Value::String(message_id.clone());
-    fs::write(index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
+    fs::write(&index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
 
     // Add child link to parent
     if parent_id != "null" {
@@ -95,6 +95,13 @@ pub fn run_jot(args: JotArgs) {
             }
         }
     }
+
+    // If current_message is null (first jot), set it
+    if index_data["current_message"].is_null() {
+        index_data["current_message"] = Value::String(message_id.clone());
+        fs::write(index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
+    }
+
 
     println!("✍️ Message jotted down to thread {}: {}", &thread_id[..8], &message_id[..8]);
 }

@@ -50,13 +50,21 @@ fn print_tree(
             "assistant" => "🧠",
             _ => "❓"
         };
-        let text = msg["text"].as_str().unwrap_or("").lines().next().unwrap_or("").trim();
+        let id_display = &current_id[..8];
+        let text = msg.get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| msg.get("markdown").and_then(|v| v.as_str()).unwrap_or("<no content>"));
 
+        let preview = text.lines().next().unwrap_or("").trim();
         let marker = if current_id == target_id { "🌳" } else { " " };
-        let indent = "    ".repeat(depth);
+        let indent = "  >  ".repeat(depth);
 
-        let preview = if text.is_empty() { "<no content>" } else { text };
-        println!("{indent}{marker} {icon} [{role}] \"{preview}\"");
+        if msg.get("markdown").is_some() {
+            println!("{indent}{marker} {icon} [{role}] \"{preview}\" 📄 {id_display}");
+        } else {
+            println!("{indent}{marker} {icon} [{role}] \"{preview}\" {id_display}");
+        }
+
 
         let empty_children = vec![];
         let children = msg["children"].as_array().unwrap_or(&empty_children);

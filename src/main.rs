@@ -28,7 +28,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Start a new conversation
-    New,
+    New {
+        #[arg(help = "Name for the new thread")]
+        name: String,
+    },
+
 
     /// Show current thread/message state
     Status {},
@@ -64,7 +68,8 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::New => commands::new::run_new(),
+        Commands::New { name } => commands::new::run_new(name),
+
 
         Commands::Status {} => status::run_status(),
 
