@@ -8,8 +8,9 @@ use serde_json::{json, Value};
 
 #[derive(Args)]
 pub struct JotArgs {
+    /// Name of the avatar (e.g., "andrew", "ai", "girlfriend")
     #[arg(short, long)]
-    pub role: String,
+    pub avatar: Option<String>,  // Optional avatar name
 
     #[arg(short, long)]
     pub text: Option<String>,
@@ -17,7 +18,6 @@ pub struct JotArgs {
     #[arg(short = 'f', long)]
     pub file: Option<PathBuf>,
 }
-
 
 pub fn run_jot(args: JotArgs) {
     if args.text.is_none() && args.file.is_none() {
@@ -38,13 +38,22 @@ pub fn run_jot(args: JotArgs) {
     let thread_id = index_data["active_thread"].as_str().unwrap();
     let parent_id = index_data["current_message"].as_str().unwrap_or("null");
 
+    // Get avatar (default to "main" if not provided)
+    let avatar_name = args.avatar.unwrap_or_else(|| "main".to_string());
+    if !avatar_exists(&avatar_name) {
+        eprintln!("❌ Avatar '{}' not found. Please create it first using `fur avatar <name>`.", avatar_name);
+        return;
+    }
+
+    let avatar = get_avatar_for_user(&avatar_name);  // Retrieve the correct avatar emoji
+
     // Generate new message
     let message_id = Uuid::new_v4().to_string();
     let timestamp = Utc::now().to_rfc3339();
 
     let mut message = json!({
         "id": message_id,
-        "role": args.role,
+        "avatar": avatar, // Use avatar instead of role
         "timestamp": timestamp,
         "parent": if parent_id == "null" { Value::Null } else { Value::String(parent_id.to_string()) },
     });
@@ -102,6 +111,31 @@ pub fn run_jot(args: JotArgs) {
         fs::write(index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
     }
 
-
     println!("✍️ Message jotted down to thread {}: {}", &thread_id[..8], &message_id[..8]);
+}
+
+fn avatar_exists(avatar_name: &str) -> bool {
+    let avatars = load_avatars();  // Load avatars from file or memory
+    avatars.get(avatar_name).is_some()  // Return true if the avatar exists
+}
+
+fn get_avatar_for_user(user: &str) -> String {
+    // This function looks up the avatar emoji from the list of stored avatars
+    let avatars = load_avatars();
+    
+    if let Some(emoji) = avatars.get(user) {
+        emoji.as_str().unwrap_or("🐾").to_string() // Return the emoji associated with the avatar
+    } else {
+        "🐾".to_string() // Default to a random emoji if not found
+    }
+}
+
+fn load_avatars() -> Value {
+    let avatars_path = Path::new(".fur/avatars.json");
+    if avatars_path.exists() {
+        let content = fs::read_to_string(avatars_path).unwrap();
+        serde_json::from_str(&content).unwrap_or_else(|_| json!({}))
+    } else {
+        json!({})
+    }
 }

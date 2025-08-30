@@ -3,15 +3,14 @@ mod utils;
 
 use clap::{Parser, Subcommand};
 use crate::commands::{
-    jot::JotArgs,
-    jot,
+    avatar,
+    jot::{self, JotArgs},
     jump::{self, JumpArgs},
     timeline::{self, TimelineArgs},
     fork,
     status,
     tree,
-    cat::CatArgs,
-    cat,
+    cat::{self, CatArgs},
 };
 
 #[derive(Parser)]
@@ -27,12 +26,25 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Set or modify avatars for users
+    Avatar {
+        /// The name of the avatar (e.g., "james", "ai", "girlfriend")
+        avatar: String,
+
+        /// Flag for creating non-main avatars (e.g., "ai", "girlfriend")
+        #[arg(short, long)]
+        other: bool,
+
+        /// Emoji for the avatar
+        #[arg(short, long)]
+        emoji: String,
+    },
+
     /// Start a new conversation
     New {
         #[arg(help = "Name for the new thread")]
         name: String,
     },
-
 
     /// Show current thread/message state
     Status {},
@@ -68,8 +80,11 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Avatar { avatar, other, emoji } => {
+            avatar::run_avatar(avatar, other, emoji);
+        }
+
         Commands::New { name } => commands::new::run_new(name),
-        
 
         Commands::Status {} => status::run_status(),
 
