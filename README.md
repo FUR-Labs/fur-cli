@@ -17,153 +17,110 @@ A memory tracker for your conversations, ideas, and AI chats.
 
 FUR is a tiny command-line tool that helps you **save and organize your chat messages** — especially your conversations with ChatGPT and other AIs — in a way that makes sense when things get complex.
 
-Unlike basic note-taking apps, FUR lets your conversations **branch**, like a tree. You can:
+Unlike note-taking apps, FUR lets your conversations **branch** into trees. You can:
 
-- **Fork** a message into multiple follow-ups.
-- **Jump** backward or forward in time.
-- **Write** or **link** Markdown files as messages.
-- **See** your thread as a timeline or tree.
-- **Track** everything locally, in simple JSON and Markdown files.
+- **Jot** text or link Markdown files as messages.  
+- **Fork** conversations into multiple possible futures.  
+- **Jump** backward or forward across messages.  
+- **See** threads as a timeline or tree.  
+- **Switch** between multiple threads.  
+- **Assign avatars** (🦊 main, 👹 others) to track who said what.  
 
-It's a **version control system for your thoughts** — like `git`, but for your chats and ideas.
+It's a **version control system for your thoughts** — like `git`, but for conversations.
 
-> 🧠 _Imagine if you could save every ChatGPT message you've ever sent — explore different paths — and revisit any version like a "save point" in a game._
+> 🧠 _Think of FUR as “save points” for your mind. Every fork, every idea path, preserved forever._
 
 ---
 
 ## 🌟 Why would I want this?
 
-Here are some examples of how people use FUR:
-
-- ✍️ **Writers**: Explore branching plotlines or rewrite drafts with different styles.
-- 🧑‍💻 **Developers**: Track coding conversations with AI, test different solutions.
-- 🧠 **Students**: Study a topic with AI, explore side questions without losing your place.
-- 📚 **Researchers**: Organize chatbot responses and notes by topic and time.
-- 🤯 **Overthinkers**: Save *every possible what-if*, and finally feel vindicated.
+- ✍️ **Writers**: Explore branching plotlines.  
+- 🧑‍💻 **Developers**: Track coding convos with AI.  
+- 🧠 **Students**: Study with side questions.  
+- 📚 **Researchers**: Organize responses and notes.  
+- 🤯 **Overthinkers**: Save *every possible what-if*.  
 
 ---
 
 ## 🛠 How does it work?
 
-FUR runs in your terminal. You use commands like these:
+All data lives in a `.fur/` folder:  
+
+- `.fur/index.json` → global state  
+- `.fur/threads/*.json` → one per thread  
+- `.fur/messages/*.json` → individual messages  
+- `.fur/avatars.json` → avatar mappings  
+
+### Example commands
 
 ```bash
 # Start a new thread
-fur new
+fur new "Penguin talks"
 
-# Add a message (yourself or AI)
-fur jot -r user -t "What’s the deal with penguins?"
-fur jot -r assistant -t "They can't fly, but they're great swimmers."
+# Add messages
+fur jot --text "Penguins are weird birds."
+fur jot jeff --text "Yo"        # from another avatar
 
-# Show the timeline of your current thread.
-fur timeline [--verbose]
-# - `--verbose`: Show full content of Markdown files linked in the messages. Without this flag, only file paths are shown.
+# Manage avatars
+fur avatar andrew                         # sets 🦊 main avatar
+fur avatar --other ai --emoji 👹          # adds another avatar
+fur avatar --view                         # list all avatars
 
-# See the tree of all forks
-fur tree
+# Manage threads
+fur thread --view                         # list threads
+fur thread d1f032d3                       # switch active thread
 
-# Jump to a past message or fork
-fur jump --past 1
-fur jump --child 0
-
-# Link a markdown file into your thread
-fur jot -r user --file /home/me/chat-notes/penguins.md
-
-# View your current status
-fur status
+# Navigate inside a thread
+fur tree                                  # tree view
+fur timeline --verbose                    # linear view
+fur jump --past 1                         # go back
+fur status                                # current state
 ```
 
-All messages are saved locally, as plain `.json` and optional `.md` files, in a `.fur` folder in your project.
-
 ---
 
-## 🔥 Why is it called FUR?
+## 🚀 Installation
 
-Because if you take the word `git` and move your fingers **one key to the left**, you get `fur`.
-
-Also, it’s warm, soft, and good at storing memory.
-
----
-
-### 🚀 Installation
-
-You’ll need [Rust](https://www.rust-lang.org/tools/install).
+You'll need [Rust](https://www.rust-lang.org/tools/install).
 
 ```bash
-cargo install fur-cli
+cargo install --path .
 ```
 
----
+Then ensure `~/.cargo/bin` is in your `PATH`.
 
-## 🧪 Quickstart Tutorial
+Upgrade after edits:
 
 ```bash
-fur new                             # Start a new thread
-fur jot -r user -t "Why are bees so weird?"      # Add a message
-fur jot -r assistant -t "They're fuzzy anarchists with wings." 
-
-fur jot -r user --file notes/bees.md             # Link a markdown file
-fur cat                                          # View current message (file or text)
-
-fur tree                                         # View thread structure
-fur jump --past 1                                # Navigate backward
-fur status                                       # See where you are
+cargo install --path . --force
 ```
-
----
-
-## 🧠 Message Modes
-
-FUR supports two styles of jotting:
-
-1. **Inline mode:**
-
-   ```bash
-   fur jot -r user -t "This is a short thought."
-   ```
-
-2. **Markdown file linking:**
-
-   ```bash
-   fur jot -r user --file path/to/note.md
-   ```
-
-Markdown files are stored *wherever you want* — we store the absolute path, not the content. You’re in charge of keeping the files alive.
-
----
-
-## 📁 Where’s the data?
-
-FUR creates a `.fur/` directory in your working folder:
-
-* `.fur/index.json` – current state
-* `.fur/threads/*.json` – each thread's structure
-* `.fur/messages/*.json` – individual message metadata
 
 ---
 
 ## 🐾 Philosophy
 
-FUR is minimal. It’s not meant to be an AI client. It’s a **memory tracker**.
+FUR is **minimal**. It's not an AI client. It's a **memory tracker** that respects:
 
-It respects your brain’s tendency to wander and your desire to keep everything. It lets you **dig**, **fork**, **write**, and **retrace**.
+* Your brain's tendency to branch.
+* Your need to retrace steps.
+* Your desire to keep *everything*.
 
-The goal? Make it **easy to think recursively** and **keep track of yourself**.
-
----
-
-## 🛣 Roadmap (v1.0)
-
-* ✅ Thread creation
-* ✅ Message jotting
-* ✅ Jumping / Forking
-* ✅ Markdown linking
-* ✅ Tree view & status
-* ⏳ Markdown rendering (future)
-* ⏳ Thread export (future)
+Goal: Make recursive thinking natural.
 
 ---
 
+## 🛣 Roadmap (v0.2 → v1.0)
+
+* ✅ Threads (`fur new`, `fur thread --view`, `fur thread <id>`)
+* ✅ Avatars (`fur avatar`, `fur avatar --view`)
+* ✅ Jotting text & files (`fur jot`)
+* ✅ Tree / Timeline views
+* ✅ Jumping & forking
+* ⏳ Thread export / import
+* ⏳ DSL for batch imports
+* ⏳ Rich markdown rendering
+
+---
 
 ## 📜 License
 
