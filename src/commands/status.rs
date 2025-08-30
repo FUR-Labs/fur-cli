@@ -11,21 +11,25 @@ pub fn run_status() {
         return;
     }
 
-    let index: Value = serde_json::from_str(
-        &fs::read_to_string(&index_path).expect("❌ Cannot read index.json")
-    ).unwrap();
+    let index: Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).expect("❌ Cannot read index.json"))
+            .unwrap();
 
     let thread_id = index["active_thread"].as_str().unwrap_or("❓");
     let current_msg_id = index["current_message"].as_str().unwrap_or("");
 
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    let thread: Value = serde_json::from_str(
-        &fs::read_to_string(&thread_path).expect("❌ Cannot read thread")
-    ).unwrap();
+    let thread: Value =
+        serde_json::from_str(&fs::read_to_string(&thread_path).expect("❌ Cannot read thread"))
+            .unwrap();
 
     println!("🧠 Current FUR Status");
     println!("─────────────────────────────");
-    println!("📌 Active thread: {} ({})", thread["title"].as_str().unwrap_or("Untitled"), thread_id);
+    println!(
+        "📌 Active thread: {} ({})",
+        thread["title"].as_str().unwrap_or("Untitled"),
+        thread_id
+    );
     println!("🧭 Current message: {}", current_msg_id);
     println!("─────────────────────────────");
 
@@ -34,7 +38,6 @@ pub fn run_status() {
 
     let mut id_to_message = std::collections::HashMap::new();
 
-    // Load messages into map
     for msg_id in messages {
         if let Some(id) = msg_id.as_str() {
             let path = fur_dir.join("messages").join(format!("{}.json", id));
@@ -46,7 +49,6 @@ pub fn run_status() {
         }
     }
 
-    // Walk up the parent chain
     let mut lineage = vec![];
     let mut current = current_msg_id;
     while let Some(msg) = id_to_message.get(current) {
@@ -58,28 +60,31 @@ pub fn run_status() {
     }
     lineage.reverse();
 
-    // Print ancestry trail
     for id in &lineage {
         if let Some(msg) = id_to_message.get(id) {
-            let role = msg["role"].as_str().unwrap_or("???");
-            let text = msg.get("text")
+            let avatar = msg["avatar"].as_str().unwrap_or("🐾");
+            let name = msg["name"].as_str().unwrap_or("???");
+            let text = msg
+                .get("text")
                 .and_then(|v| v.as_str())
-                .unwrap_or_else(|| msg.get("markdown").and_then(|v| v.as_str()).unwrap_or("<no content>"));
+                .unwrap_or_else(|| {
+                    msg.get("markdown")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("<no content>")
+                });
 
             let preview = text.lines().next().unwrap_or("").chars().take(40).collect::<String>();
             let marker = if id == current_msg_id { "🧭 (current)" } else { "✅" };
             let id_display = &id[..8];
 
             if msg.get("markdown").is_some() {
-                println!("{preview} [{role}] 📄 {id_display} {marker}");
+                println!("{preview} {avatar} [{name}] 📄 {id_display} {marker}");
             } else {
-                println!("{preview} [{role}] {id_display} {marker}");
+                println!("{preview} {avatar} [{name}] {id_display} {marker}");
             }
         }
     }
-    
 
-    // Print children of current message
     println!("─────────────────────────────");
     println!("Children of current:");
     if let Some(curr_msg) = id_to_message.get(current_msg_id) {
@@ -88,20 +93,27 @@ pub fn run_status() {
         for child in children {
             if let Some(child_id) = child.as_str() {
                 if let Some(child_msg) = id_to_message.get(child_id) {
-                    let role = child_msg["role"].as_str().unwrap_or("???");
-                    let text = child_msg.get("text")
+                    let avatar = child_msg["avatar"].as_str().unwrap_or("🐾");
+                    let name = child_msg["name"].as_str().unwrap_or("???");
+                    let text = child_msg
+                        .get("text")
                         .and_then(|v| v.as_str())
-                        .unwrap_or_else(|| child_msg.get("markdown").and_then(|v| v.as_str()).unwrap_or("<no content>"));
+                        .unwrap_or_else(|| {
+                            child_msg
+                                .get("markdown")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("<no content>")
+                        });
 
-                    let preview = text.lines().next().unwrap_or("").chars().take(40).collect::<String>();
+                    let preview =
+                        text.lines().next().unwrap_or("").chars().take(40).collect::<String>();
                     let id_display = &child_id[..8];
 
                     if child_msg.get("markdown").is_some() {
-                        println!("🔹 {preview} [{role}] 📄 {id_display}");
+                        println!("🔹 {preview} {avatar} [{name}] 📄 {id_display}");
                     } else {
-                        println!("🔹 {preview} [{role}] {id_display}");
+                        println!("🔹 {preview} {avatar} [{name}] {id_display}");
                     }
-
                 }
             }
         }

@@ -34,18 +34,32 @@ pub fn run_jot(args: JotArgs) {
     }
 
     // Load index + thread
-    let index_data: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+    let index_data: Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
     let thread_id = index_data["active_thread"].as_str().unwrap();
     let parent_id = index_data["current_message"].as_str().unwrap_or("null");
 
-    // Get avatar (default to "main" if not provided)
-    let avatar_name = args.avatar.unwrap_or_else(|| "main".to_string());
-    if !avatar_exists(&avatar_name) {
-        eprintln!("❌ Avatar '{}' not found. Please create it first using `fur avatar <name>`.", avatar_name);
+    // Load avatars
+    let avatars = load_avatars();
+
+    // If no avatar passed, resolve to main pointer
+    let avatar_name = args.avatar.unwrap_or_else(|| {
+        avatars["main"]
+            .as_str()
+            .unwrap_or("main")
+            .to_string()
+    });
+
+    // Check avatar exists
+    if avatars.get(&avatar_name).is_none() {
+        eprintln!(
+            "❌ Avatar '{}' not found. Please create it first using `fur avatar {}`.",
+            avatar_name, avatar_name
+        );
         return;
     }
 
-    let avatar = get_avatar_for_user(&avatar_name);  // Retrieve the correct avatar emoji
+    let emoji = avatars[&avatar_name].as_str().unwrap_or("🐾").to_string();
 
     // Generate new message
     let message_id = Uuid::new_v4().to_string();
@@ -53,7 +67,8 @@ pub fn run_jot(args: JotArgs) {
 
     let mut message = json!({
         "id": message_id,
-        "avatar": avatar, // Use avatar instead of role
+        "avatar": emoji,       // store emoji
+        "name": avatar_name,   // store name
         "timestamp": timestamp,
         "parent": if parent_id == "null" { Value::Null } else { Value::String(parent_id.to_string()) },
     });
@@ -65,7 +80,8 @@ pub fn run_jot(args: JotArgs) {
     if let Some(file_path) = args.file {
         match fs::canonicalize(&file_path) {
             Ok(abs_path) => {
-                message["markdown"] = Value::String(abs_path.to_string_lossy().to_string());
+                message["markdown"] =
+                    Value::String(abs_path.to_string_lossy().to_string());
             }
             Err(_) => {
                 eprintln!("❌ Could not resolve file path: {:?}", file_path);
@@ -81,14 +97,27 @@ pub fn run_jot(args: JotArgs) {
 
     // Append to thread
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    let mut thread_data: Value = serde_json::from_str(&fs::read_to_string(&thread_path).unwrap()).unwrap();
-    thread_data["messages"].as_array_mut().unwrap().push(Value::String(message_id.clone()));
-    fs::write(&thread_path, serde_json::to_string_pretty(&thread_data).unwrap()).unwrap();
+    let mut thread_data: Value =
+        serde_json::from_str(&fs::read_to_string(&thread_path).unwrap()).unwrap();
+    thread_data["messages"]
+        .as_array_mut()
+        .unwrap()
+        .push(Value::String(message_id.clone()));
+    fs::write(
+        &thread_path,
+        serde_json::to_string_pretty(&thread_data).unwrap(),
+    )
+    .unwrap();
 
     // Update index
-    let mut index_data: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+    let mut index_data: Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
     index_data["current_message"] = Value::String(message_id.clone());
-    fs::write(&index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
+    fs::write(
+        &index_path,
+        serde_json::to_string_pretty(&index_data).unwrap(),
+    )
+    .unwrap();
 
     // Add child link to parent
     if parent_id != "null" {
@@ -100,7 +129,11 @@ pub fn run_jot(args: JotArgs) {
                 }
                 let children = parent_json["children"].as_array_mut().unwrap();
                 children.push(Value::String(message_id.clone()));
-                fs::write(parent_path, serde_json::to_string_pretty(&parent_json).unwrap()).unwrap();
+                fs::write(
+                    parent_path,
+                    serde_json::to_string_pretty(&parent_json).unwrap(),
+                )
+                .unwrap();
             }
         }
     }
@@ -108,26 +141,17 @@ pub fn run_jot(args: JotArgs) {
     // If current_message is null (first jot), set it
     if index_data["current_message"].is_null() {
         index_data["current_message"] = Value::String(message_id.clone());
-        fs::write(index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
+        fs::write(
+            index_path,
+            serde_json::to_string_pretty(&index_data).unwrap(),
+        )
+        .unwrap();
     }
 
-    println!("✍️ Message jotted down to thread {}: {}", &thread_id[..8], &message_id[..8]);
-}
-
-fn avatar_exists(avatar_name: &str) -> bool {
-    let avatars = load_avatars();  // Load avatars from file or memory
-    avatars.get(avatar_name).is_some()  // Return true if the avatar exists
-}
-
-fn get_avatar_for_user(user: &str) -> String {
-    // This function looks up the avatar emoji from the list of stored avatars
-    let avatars = load_avatars();
-    
-    if let Some(emoji) = avatars.get(user) {
-        emoji.as_str().unwrap_or("🐾").to_string() // Return the emoji associated with the avatar
-    } else {
-        "🐾".to_string() // Default to a random emoji if not found
-    }
+    println!(
+        "✍️ Message jotted down to thread {}: {} [{}]",
+        &thread_id[..8], &message_id[..8], avatar_name
+    );
 }
 
 fn load_avatars() -> Value {

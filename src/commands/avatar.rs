@@ -1,61 +1,26 @@
 use std::fs::{self};
-use std::path::{Path};
+use std::path::Path;
 use serde_json::{json, Value};
+use rand::prelude::*; // Import prelude to bring in `choose`
+use rand::rng;
 
-pub fn run_avatar(avatar: String, other: bool, emoji: String) {
-    // If it's not the main user, ensure the --other flag is provided
-    if avatar == "main" && other {
-        eprintln!("❌ 'main' cannot be set with the --other flag. It is the default avatar.");
-        return;
-    }
-
-    // If it's not the main user, ensure the --other flag is provided
-    if avatar != "main" && !other {
-        eprintln!("❌ To create an avatar for '{}', please use the --other flag.", avatar);
-        return;
-    }
-
-    // If defining a new avatar, rename 'main' to the new avatar name
-    if avatar != "main" {
-        rename_main_avatar(&avatar, &emoji);
-    }
-
-    // Create or update the avatar
-    create_avatar(&avatar, &emoji);
-
-    println!("✔️ Avatar '{}' created with emoji '{}'.", avatar, emoji);
-}
-
-fn rename_main_avatar(new_avatar_name: &str, emoji: &str) {
+pub fn run_avatar(avatar: String, other: bool, emoji: Option<String>) {
     let mut avatars = load_avatars();
 
-    // Convert Value to Map<String, Value> to modify it
-    if let Some(map) = avatars.as_object_mut() {
-        // Remove "main" if it exists and add the new avatar
-        if let Some(_) = map.remove("main") {
-            map.insert(new_avatar_name.to_string(), json!(emoji));
-            save_avatars(&avatars);
-        } else {
-            eprintln!("❌ 'main' avatar not found. Cannot rename.");
-        }
+    if !other {
+        // Set main avatar
+        let e = emoji.unwrap_or_else(|| "🦊".to_string());
+        avatars["main"] = json!(avatar);       // main pointer
+        avatars[&avatar] = json!(e);           // actual avatar entry
+        println!("✔️ Main avatar set: {} [{}]", e, avatar);
     } else {
-        eprintln!("❌ Failed to load avatars as a map.");
+        // Set secondary avatar
+        let e = emoji.unwrap_or_else(|| get_random_emoji());
+        avatars[&avatar] = json!(e);
+        println!("✔️ Other avatar '{}' created with emoji '{}'", avatar, e);
     }
-}
 
-fn create_avatar(avatar_name: &str, emoji: &str) {
-    let mut avatars = load_avatars();
-
-    // Convert Value to Map<String, Value> to modify it
-    if let Some(map) = avatars.as_object_mut() {
-        // Add or update the avatar with the provided emoji
-        map.insert(avatar_name.to_string(), json!(emoji));
-
-        // Save updated avatars to file
-        save_avatars(&avatars);
-    } else {
-        eprintln!("❌ Failed to load avatars as a map.");
-    }
+    save_avatars(&avatars);
 }
 
 fn load_avatars() -> Value {
@@ -70,5 +35,16 @@ fn load_avatars() -> Value {
 
 fn save_avatars(avatars: &Value) {
     let avatars_path = Path::new(".fur/avatars.json");
-    fs::write(avatars_path, serde_json::to_string_pretty(avatars).unwrap()).unwrap();
+    fs::write(
+        avatars_path,
+        serde_json::to_string_pretty(avatars).unwrap(),
+    )
+    .unwrap();
+}
+
+// Get a random emoji for secondary avatars
+fn get_random_emoji() -> String {
+    let emojis = ["👹", "👧", "👤", "🐺", "🤖"];
+    let mut rng = rng(); // Create a random number generator
+    emojis.choose(&mut rng).unwrap_or(&"🐾").to_string()
 }

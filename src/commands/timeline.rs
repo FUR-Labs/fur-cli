@@ -12,7 +12,6 @@ pub struct TimelineArgs {
 }
 
 pub fn run_timeline(args: TimelineArgs) {
-
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
 
@@ -54,7 +53,8 @@ pub fn run_timeline(args: TimelineArgs) {
         if let Ok(msg_content) = fs::read_to_string(&msg_path) {
             if let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) {
                 let time = msg_json["timestamp"].as_str().unwrap_or("???");
-                let role = msg_json["role"].as_str().unwrap_or("unknown");
+                let avatar = msg_json["avatar"].as_str().unwrap_or("🐾");
+                let name = msg_json["name"].as_str().unwrap_or("unknown");
 
                 // Handle missing text with a fallback message
                 let text = msg_json["text"].as_str().unwrap_or_else(|| {
@@ -65,23 +65,19 @@ pub fn run_timeline(args: TimelineArgs) {
                     }
                 });
 
-
-                println!("🕰️  {} [{}]:\n{}\n", time, role, text);
+                println!("🕰️  {} {} [{}]:\n{}\n", time, avatar, name, text);
 
                 // Check for markdown reference
                 if let Some(path_str) = msg_json["markdown"].as_str() {
                     println!("🔍 Resolving markdown file at: {}", path_str);
 
-                    // Check verbose flag to decide whether to show full content or just the file path
                     if args.verbose {
                         if let Ok(contents) = fs::read_to_string(path_str) {
                             println!("📄 Linked Markdown Content:\n{}", contents);
                         } else {
-                            // If file can't be read, show the path
                             println!("⚠️ Could not read linked markdown file at: {}", path_str);
                         }
                     } else {
-                        // Just display the file path
                         println!("📂 Linked Markdown file: {}", path_str);
                     }
                 }

@@ -37,7 +37,7 @@ enum Commands {
 
         /// Emoji for the avatar
         #[arg(short, long)]
-        emoji: String,
+        emoji: Option<String>,  // Make this optional
     },
 
     /// Start a new conversation
@@ -67,7 +67,7 @@ enum Commands {
     Jot(JotArgs),
 
     /// Show the thread as a linear timeline
-    Timeline(TimelineArgs),  // Add verbose flag here
+    Timeline(TimelineArgs),  // Pass verbose flag here
 
     /// Show the thread as a branching tree
     Tree {},
@@ -81,6 +81,7 @@ fn main() {
 
     match cli.command {
         Commands::Avatar { avatar, other, emoji } => {
+            // Wrap emoji in Some() before passing to run_avatar
             avatar::run_avatar(avatar, other, emoji);
         }
 
