@@ -6,7 +6,7 @@ use crate::commands::{
     jot::JotArgs,
     jot,
     jump::{self, JumpArgs},
-    timeline,
+    timeline::{self, TimelineArgs},
     fork,
     status,
     tree,
@@ -55,7 +55,7 @@ enum Commands {
     Jot(JotArgs),
 
     /// Show the thread as a linear timeline
-    Timeline {},
+    Timeline(TimelineArgs),  // Add verbose flag here
 
     /// Show the thread as a branching tree
     Tree {},
@@ -69,7 +69,7 @@ fn main() {
 
     match cli.command {
         Commands::New { name } => commands::new::run_new(name),
-
+        
 
         Commands::Status {} => status::run_status(),
 
@@ -89,7 +89,7 @@ fn main() {
 
         Commands::Jot(args) => jot::run_jot(args),
 
-        Commands::Timeline {} => timeline::run_timeline(),
+        Commands::Timeline(args) => timeline::run_timeline(args),  // Pass args here
 
         Commands::Tree {} => tree::run_tree(),
 

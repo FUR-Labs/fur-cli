@@ -1,8 +1,18 @@
 use std::fs;
 use std::path::Path;
 use serde_json::Value;
+use clap::Parser;
 
-pub fn run_timeline() {
+/// Timeline command structure with verbose flag
+#[derive(Parser)]
+pub struct TimelineArgs {
+    /// Whether to show full content of Markdown files
+    #[arg(short, long)]
+    pub verbose: bool,
+}
+
+pub fn run_timeline(args: TimelineArgs) {
+
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
 
@@ -45,9 +55,36 @@ pub fn run_timeline() {
             if let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) {
                 let time = msg_json["timestamp"].as_str().unwrap_or("???");
                 let role = msg_json["role"].as_str().unwrap_or("unknown");
-                let text = msg_json["text"].as_str().unwrap_or("???");
+
+                // Handle missing text with a fallback message
+                let text = msg_json["text"].as_str().unwrap_or_else(|| {
+                    if msg_json["markdown"].is_null() {
+                        "No comment"
+                    } else {
+                        "No comment, just a file:"
+                    }
+                });
+
 
                 println!("🕰️  {} [{}]:\n{}\n", time, role, text);
+
+                // Check for markdown reference
+                if let Some(path_str) = msg_json["markdown"].as_str() {
+                    println!("🔍 Resolving markdown file at: {}", path_str);
+
+                    // Check verbose flag to decide whether to show full content or just the file path
+                    if args.verbose {
+                        if let Ok(contents) = fs::read_to_string(path_str) {
+                            println!("📄 Linked Markdown Content:\n{}", contents);
+                        } else {
+                            // If file can't be read, show the path
+                            println!("⚠️ Could not read linked markdown file at: {}", path_str);
+                        }
+                    } else {
+                        // Just display the file path
+                        println!("📂 Linked Markdown file: {}", path_str);
+                    }
+                }
             }
         }
     }

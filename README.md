@@ -55,8 +55,9 @@ fur new
 fur jot -r user -t "What’s the deal with penguins?"
 fur jot -r assistant -t "They can't fly, but they're great swimmers."
 
-# View a timeline
-fur timeline
+# Show the timeline of your current thread.
+fur timeline [--verbose]
+# - `--verbose`: Show full content of Markdown files linked in the messages. Without this flag, only file paths are shown.
 
 # See the tree of all forks
 fur tree
