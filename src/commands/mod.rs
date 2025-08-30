@@ -4,6 +4,7 @@ pub mod jot;
 pub mod timeline;
 pub mod fork;
 pub mod status;
+pub mod thread;
 pub mod jump;
 pub mod tree;
 pub mod cat;

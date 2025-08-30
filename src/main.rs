@@ -52,6 +52,16 @@ enum Commands {
     /// Show current thread/message state
     Status {},
 
+    /// Manage threads (list or switch)
+    Thread {
+        /// Show all threads
+        #[arg(long)]
+        view: bool,
+
+        /// Switch to a specific thread ID
+        id: Option<String>,
+    },
+
     /// Fork the current message into a new thread
     Fork {
         /// ID of the message to fork from (optional)
@@ -91,6 +101,10 @@ fn main() {
         Commands::New { name } => commands::new::run_new(name),
 
         Commands::Status {} => status::run_status(),
+
+        Commands::Thread { view, id } => {
+            commands::thread::run_thread(view, id);
+        }
 
         Commands::Fork { id } => {
             if id.is_empty() {
