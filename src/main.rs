@@ -26,10 +26,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Set or modify avatars for users
     Avatar {
         /// The name of the avatar (e.g., "james", "ai", "girlfriend")
-        avatar: String,
+        avatar: Option<String>,  // becomes optional
 
         /// Flag for creating non-main avatars (e.g., "ai", "girlfriend")
         #[arg(short, long)]
@@ -37,7 +36,11 @@ enum Commands {
 
         /// Emoji for the avatar
         #[arg(short, long)]
-        emoji: Option<String>,  // Make this optional
+        emoji: Option<String>,
+
+        /// See all your avatars
+        #[arg(long)]
+        view: bool, 
     },
 
     /// Start a new conversation
@@ -80,9 +83,9 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Avatar { avatar, other, emoji } => {
+        Commands::Avatar { avatar, other, emoji, view } => {
             // Wrap emoji in Some() before passing to run_avatar
-            avatar::run_avatar(avatar, other, emoji);
+            avatar::run_avatar(avatar, other, emoji, view);
         }
 
         Commands::New { name } => commands::new::run_new(name),

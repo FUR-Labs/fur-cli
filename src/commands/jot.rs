@@ -8,13 +8,18 @@ use serde_json::{json, Value};
 
 #[derive(Args)]
 pub struct JotArgs {
-    /// Name of the avatar (e.g., "andrew", "ai", "girlfriend")
-    #[arg(short, long)]
-    pub avatar: Option<String>,  // Optional avatar name
+    /// Optional positional avatar name (e.g., "andrew", "ai")
+    pub avatar_positional: Option<String>,
 
+    /// Avatar name via flag
+    #[arg(short, long)]
+    pub avatar: Option<String>,
+
+    /// Message text
     #[arg(short, long)]
     pub text: Option<String>,
 
+    /// Attach a markdown file
     #[arg(short = 'f', long)]
     pub file: Option<PathBuf>,
 }
@@ -42,15 +47,14 @@ pub fn run_jot(args: JotArgs) {
     // Load avatars
     let avatars = load_avatars();
 
-    // If no avatar passed, resolve to main pointer
-    let avatar_name = args.avatar.unwrap_or_else(|| {
-        avatars["main"]
-            .as_str()
-            .unwrap_or("main")
-            .to_string()
-    });
+    // Priority: explicit flag > positional arg > main pointer
+    let avatar_name = args.avatar
+        .or(args.avatar_positional)
+        .unwrap_or_else(|| {
+            avatars["main"].as_str().unwrap_or("main").to_string()
+        });
 
-    // Check avatar exists
+    // Validate avatar exists
     if avatars.get(&avatar_name).is_none() {
         eprintln!(
             "❌ Avatar '{}' not found. Please create it first using `fur avatar {}`.",
@@ -67,8 +71,8 @@ pub fn run_jot(args: JotArgs) {
 
     let mut message = json!({
         "id": message_id,
-        "avatar": emoji,       // store emoji
-        "name": avatar_name,   // store name
+        "avatar": emoji,
+        "name": avatar_name,
         "timestamp": timestamp,
         "parent": if parent_id == "null" { Value::Null } else { Value::String(parent_id.to_string()) },
     });
@@ -90,7 +94,7 @@ pub fn run_jot(args: JotArgs) {
         }
     }
 
-    // Save message to .fur/messages/
+    // Save message
     let message_path = fur_dir.join("messages").join(format!("{}.json", message_id));
     let mut file = File::create(&message_path).unwrap();
     file.write_all(message.to_string().as_bytes()).unwrap();
