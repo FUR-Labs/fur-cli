@@ -19,7 +19,7 @@ pub fn run_new(name: String) {
             "threads": [],
             "active_thread": null,
             "created_at": Utc::now().to_rfc3339(),
-            "schema_version": "0.1"
+            "schema_version": "0.2"
         });
 
         let mut file = File::create(index_path).expect("Failed to write .fur/index.json");

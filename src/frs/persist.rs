@@ -85,6 +85,9 @@ pub fn persist_frs(thread: &Thread) -> String {
     index_data["threads"].as_array_mut().unwrap().push(thread_id.clone().into());
     index_data["active_thread"] = thread_id.clone().into();
     index_data["current_message"] = Value::Null;
+    if index_data["schema_version"].as_str() == Some("0.1") {
+        index_data["schema_version"] = Value::String("0.2".to_string());
+    }
 
     fs::write(&index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
 
