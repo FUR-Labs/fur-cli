@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
+use serde_json::{Value, json};
 use clap::Parser;
 
 /// Timeline command structure with verbose flag
@@ -37,6 +37,11 @@ pub fn run_timeline(args: TimelineArgs) {
         &fs::read_to_string(&thread_path).expect("Cannot read thread")
     ).unwrap();
 
+    // load avatars.json once
+    let avatars: Value = serde_json::from_str(
+        &fs::read_to_string(fur_dir.join("avatars.json")).unwrap_or_else(|_| "{}".to_string())
+    ).unwrap_or(json!({}));
+
     let empty = vec![];
     let messages = thread_data["messages"].as_array().unwrap_or(&empty);
 
@@ -50,13 +55,13 @@ pub fn run_timeline(args: TimelineArgs) {
     // Root messages (stem level)
     for msg_id in messages {
         if let Some(id) = msg_id.as_str() {
-            render_message(&fur_dir, id, "Root".to_string(), args.verbose);
+            render_message(&fur_dir, id, "Root".to_string(), args.verbose, &avatars);
         }
     }
 }
 
 /// Recursive renderer (flat, no indentation)
-fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool) {
+fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool, avatars: &Value) {
     let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
     let msg_content = match fs::read_to_string(&msg_path) {
         Ok(c) => c,
@@ -69,7 +74,8 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool) {
     };
 
     let time = msg_json["timestamp"].as_str().unwrap_or("???");
-    let avatar = msg_json["avatar"].as_str().unwrap_or("🐾");
+    let avatar_key = msg_json["avatar"].as_str().unwrap_or("???");
+    let emoji = avatar_with_emoji(avatars, avatar_key);
     let name = msg_json["name"].as_str().unwrap_or("unknown");
 
     // Message text or fallback
@@ -81,7 +87,7 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool) {
         }
     });
 
-    println!("🕰️  {} [{}] {} [{}]:", time, label, avatar, name);
+    println!("🕰️  {} [{}] {} [{}]:", time, label, emoji, name);
     println!("{}\n", text);
 
     // Markdown linked file
@@ -110,7 +116,7 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool) {
                             } else {
                                 format!("{}.{}", label.replace("Branch ", ""), b_idx + 1)
                             };
-                            render_message(fur_dir, c_id, new_label, verbose);
+                            render_message(fur_dir, c_id, new_label, verbose, avatars);
                         }
                     }
                 }
@@ -123,8 +129,17 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool) {
     if let Some(children) = msg_json["children"].as_array() {
         for child_id in children {
             if let Some(c_id) = child_id.as_str() {
-                render_message(fur_dir, c_id, label.clone(), verbose);
+                render_message(fur_dir, c_id, label.clone(), verbose, avatars);
             }
         }
     }
+}
+
+/// Map avatar → emoji
+fn avatar_with_emoji(avatars: &Value, avatar_key: &str) -> String {
+    avatars
+        .get(avatar_key)
+        .and_then(|v| v.as_str())
+        .unwrap_or("🐾")
+        .to_string()
 }
