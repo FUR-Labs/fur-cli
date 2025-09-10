@@ -3,8 +3,11 @@
 # FUR versioning (ironic/poetic isn't it?)
 .fur
 fur/
+*TIMELINE.md
 
+# YGG / FUR
 SHOW.md
 
+# tests dev
 example*.frs
 examples_chats
