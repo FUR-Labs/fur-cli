@@ -26,9 +26,15 @@ pub fn collect_avatars(msgs: &[Message], acc: &mut Vec<String>) {
         if !acc.contains(&m.avatar) {
             acc.push(m.avatar.clone());
         }
+        // Walk flat children (legacy)
         collect_avatars(&m.children, acc);
+        // Walk grouped branches
+        for block in &m.branches {
+            collect_avatars(block, acc);
+        }
     }
 }
+
 
 pub fn get_random_emoji() -> String {
     let emojis = ["👹", "🐵", "🐧", "🐺", "🦁"];

@@ -1,10 +1,10 @@
-use std::fs;
-use std::path::Path;
-use serde_json::{json, Value};
-use crate::frs::ast::{Thread, Message};
-
 use uuid::Uuid;
 use chrono::Utc;
+use serde_json::{json, Value};
+use std::fs;
+use std::path::Path;
+
+use crate::frs::ast::{Thread, Message};
 
 /// Persist a parsed Thread into .fur/threads + .fur/messages
 pub fn persist_frs(thread: &Thread) -> String {
@@ -13,66 +13,71 @@ pub fn persist_frs(thread: &Thread) -> String {
         panic!("🚨 .fur directory not initialized. Run `fur new` at least once.");
     }
 
-    // 1. Create new thread ID
     let thread_id = Uuid::new_v4().to_string();
     let timestamp = Utc::now().to_rfc3339();
 
-    // 2. Collect messages and write them
-    let mut message_ids: Vec<String> = Vec::new();
-    persist_messages(&thread.messages, None, &mut message_ids);
+    // Persist only the *root* jots; recursion handles nested branches
+    let root_ids = persist_level(&thread.messages, None);
 
-    // 3. Write thread JSON
     let thread_json = json!({
         "id": thread_id,
         "created_at": timestamp,
         "title": thread.title,
         "tags": thread.tags,
-        "messages": message_ids,
+        "messages": root_ids, // only roots here
     });
 
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
     fs::write(&thread_path, serde_json::to_string_pretty(&thread_json).unwrap())
         .expect("❌ Could not write thread file");
 
-    // 4. Update index.json
+    // Update index.json
     let index_path = fur_dir.join("index.json");
     let mut index_data: Value =
         serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
 
-    index_data["threads"]
-        .as_array_mut()
-        .unwrap()
-        .push(thread_id.clone().into());
+    index_data["threads"].as_array_mut().unwrap().push(thread_id.clone().into());
     index_data["active_thread"] = thread_id.clone().into();
     index_data["current_message"] = Value::Null;
 
-    fs::write(
-        &index_path,
-        serde_json::to_string_pretty(&index_data).unwrap(),
-    )
-    .unwrap();
+    fs::write(&index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
 
     println!("🌱 Imported thread into .fur: {} — \"{}\"", &thread_id[..8], thread.title);
-
     thread_id
 }
 
-fn persist_messages(msgs: &[Message], parent: Option<String>, all_ids: &mut Vec<String>) {
+/// Persist a list of messages that share the same parent.
+/// Returns the IDs of **these** messages (not descendants).
+fn persist_level(msgs: &[Message], parent: Option<String>) -> Vec<String> {
+    let mut ids_at_this_level: Vec<String> = Vec::new();
+
     for m in msgs {
         let msg_id = Uuid::new_v4().to_string();
 
-        // Children are persisted recursively
-        let mut child_ids: Vec<String> = Vec::new();
-        persist_messages(&m.children, Some(msg_id.clone()), &mut child_ids);
+        // For this message, persist each branch block; collect:
+        //  - groups of direct child IDs (per block)
+        //  - a flat list of all direct child IDs
+        let mut branch_groups_ids: Vec<Vec<String>> = Vec::new();
+        let mut direct_children_ids: Vec<String> = Vec::new();
 
+        for branch_block in &m.branches {
+            let group_ids = persist_level(branch_block, Some(msg_id.clone()));
+            if !group_ids.is_empty() {
+                direct_children_ids.extend(group_ids.clone());
+                branch_groups_ids.push(group_ids);
+            }
+        }
+
+        // Now write this message JSON
         let msg_json = json!({
             "id": msg_id,
             "avatar": m.avatar,
-            "name": m.avatar, // store avatar name, emoji already in avatars.json
+            "name": m.avatar,
             "text": m.text,
             "markdown": m.file,
             "parent": parent,
-            "children": child_ids,
+            "children": direct_children_ids,   // flat direct children (compat)
+            "branches": branch_groups_ids,     // grouped branch blocks (new)
             "timestamp": Utc::now().to_rfc3339(),
         });
 
@@ -80,7 +85,8 @@ fn persist_messages(msgs: &[Message], parent: Option<String>, all_ids: &mut Vec<
         fs::write(&path, serde_json::to_string_pretty(&msg_json).unwrap())
             .expect("❌ Could not write message file");
 
-        all_ids.push(msg_id);
+        ids_at_this_level.push(msg_id);
     }
-}
 
+    ids_at_this_level
+}

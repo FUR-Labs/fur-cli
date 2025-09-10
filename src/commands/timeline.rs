@@ -45,80 +45,96 @@ pub fn run_timeline(args: TimelineArgs) {
         return;
     }
 
-    println!("🧵 Thread: {}\n", &thread_data["title"]);
+    println!("🧵 Thread: \"{}\"\n", &thread_data["title"]);
 
-    // Enumerate top-level messages as Root 1..N
+    // Root messages (stem level)
     for msg_id in messages {
-        if let Some(id_str) = msg_id.as_str() {
-            let path = vec![]; // start empty
-            print_message_recursive(&fur_dir, id_str, 0, &path, &args);
+        if let Some(id) = msg_id.as_str() {
+            render_message(&fur_dir, id, "Root".to_string(), 0, args.verbose);
         }
     }
 }
 
-/// Pretty-join a path like [1,2,3] -> "1.2.3"
-fn path_str(path: &[usize]) -> String {
-    path.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(".")
-}
-
-/// Recursively print a message and its children, with Root/Branch notation
-fn print_message_recursive(
-    fur_dir: &Path,
-    msg_id: &str,
-    depth: usize,
-    path: &[usize],
-    args: &TimelineArgs,
-) {
+/// Recursive renderer
+fn render_message(fur_dir: &Path, msg_id: &str, label: String, depth: usize, verbose: bool) {
     let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
-    if let Ok(msg_content) = fs::read_to_string(&msg_path) {
-        if let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) {
-            let time = msg_json["timestamp"].as_str().unwrap_or("???");
-            let avatar = msg_json["avatar"].as_str().unwrap_or("🐾");
-            let name = msg_json["name"].as_str().unwrap_or("unknown");
+    let msg_content = match fs::read_to_string(&msg_path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
 
-            // Handle missing text with a fallback message
-            let text = msg_json["text"].as_str().unwrap_or_else(|| {
-                if msg_json["markdown"].is_null() {
-                    "No comment"
-                } else {
-                    "No comment, just a file:"
-                }
-            });
+    let msg_json: Value = match serde_json::from_str(&msg_content) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
 
-            let indent = "    ".repeat(depth);
-            let label = if depth == 0 {
-                "[Root]".to_string()
+    let time = msg_json["timestamp"].as_str().unwrap_or("???");
+    let avatar = msg_json["avatar"].as_str().unwrap_or("🐾");
+    let name = msg_json["name"].as_str().unwrap_or("unknown");
+
+    // Message text or fallback
+    let text = msg_json["text"].as_str().unwrap_or_else(|| {
+        if msg_json["markdown"].is_null() {
+            "No comment"
+        } else {
+            "No comment, just a file:"
+        }
+    });
+
+    let indent = "    ".repeat(depth);
+    println!(
+        "{}🕰️  {} [{}] {} [{}]:\n{}{}\n",
+        indent,
+        time,
+        label,
+        avatar,
+        name,
+        indent,
+        text
+    );
+
+    // Markdown linked file
+    if let Some(path_str) = msg_json["markdown"].as_str() {
+        println!("{}🔍 Resolving markdown file at: {}", indent, path_str);
+        if verbose {
+            if let Ok(contents) = fs::read_to_string(path_str) {
+                println!("{}📄 Linked Markdown Content:\n{}", indent, contents);
             } else {
-                format!("[Branch {}]", path_str(path))
-            };
+                println!("{}⚠️ Could not read linked markdown file at: {}", indent, path_str);
+            }
+        } else {
+            println!("{}📂 Linked Markdown file: {}", indent, path_str);
+        }
+    }
 
-            println!(
-                "{indent}🕰️  {time} {label} {avatar} [{name}]:\n{indent}{text}\n"
-            );
-
-            // Markdown reference if present
-            if let Some(path_str) = msg_json["markdown"].as_str() {
-                println!("{indent}🔍 Resolving markdown file at: {path_str}");
-                if args.verbose {
-                    if let Ok(contents) = fs::read_to_string(path_str) {
-                        println!("{indent}📄 Linked Markdown Content:\n{contents}");
-                    } else {
-                        println!("{indent}⚠️ Could not read linked markdown file at: {path_str}");
+    // Branch-aware recursion
+    if let Some(branches) = msg_json["branches"].as_array() {
+        if !branches.is_empty() {
+            for (b_idx, branch) in branches.iter().enumerate() {
+                if let Some(branch_arr) = branch.as_array() {
+                    for child_id in branch_arr {
+                        if let Some(c_id) = child_id.as_str() {
+                            let new_label = if label == "Root" {
+                                // First-level branches
+                                format!("Branch {}", b_idx + 1)
+                            } else {
+                                // Nested branches
+                                format!("{}.{}", label.replace("Branch ", ""), b_idx + 1)
+                            };
+                            render_message(fur_dir, c_id, new_label, depth + 1, verbose);
+                        }
                     }
-                } else {
-                    println!("{indent}📂 Linked Markdown file: {path_str}");
                 }
             }
+            return; // ✅ don’t fall back to children if branches exist
+        }
+    }
 
-            // Recurse into children, numbering them
-            if let Some(children) = msg_json["children"].as_array() {
-                for (i, child_id) in children.iter().enumerate() {
-                    if let Some(child_str) = child_id.as_str() {
-                        let mut child_path = path.to_vec();
-                        child_path.push(i + 1); // 1-based numbering
-                        print_message_recursive(fur_dir, child_str, depth + 1, &child_path, args);
-                    }
-                }
+    // Legacy fallback: use children if no branches
+    if let Some(children) = msg_json["children"].as_array() {
+        for child_id in children {
+            if let Some(c_id) = child_id.as_str() {
+                render_message(fur_dir, c_id, label.clone(), depth + 1, verbose);
             }
         }
     }

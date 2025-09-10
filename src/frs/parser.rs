@@ -3,28 +3,23 @@ use std::fs;
 use crate::frs::ast::{Thread, Message};
 use crate::frs::avatars::{load_avatars, save_avatars, collect_avatars, get_random_emoji};
 
-
 /// Pure parser: read .frs into a Thread struct (no side effects)
 pub fn parse_frs(path: &str) -> Thread {
     let raw = fs::read_to_string(path).expect("❌ Could not read .frs file");
     let lines: Vec<String> = raw
         .lines()
         .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .collect();
 
     let mut i = 0usize;
 
     // ---- header: new "Title"
     let title = loop {
-        if i >= lines.len() {
-            panic!("❌ Missing `new \"Title\"` at top of file");
-        }
+        if i >= lines.len() { panic!("❌ Missing `new \"Title\"` at top of file"); }
         let line = &lines[i];
         if line.starts_with("new ") {
-            break extract_quoted(line).unwrap_or_else(|| {
-                panic!("❌ Could not parse thread title from: {}", line)
-            });
+            break extract_quoted(line).unwrap_or_else(|| panic!("❌ Could not parse thread title from: {}", line));
         }
         i += 1;
     };
@@ -33,13 +28,11 @@ pub fn parse_frs(path: &str) -> Thread {
 
     // ---- optional tags
     if i < lines.len() && lines[i].starts_with("tags") {
-        if let Some(tags) = parse_tags_line(&lines[i]) {
-            thread.tags = tags;
-        }
+        if let Some(tags) = parse_tags_line(&lines[i]) { thread.tags = tags; }
         i += 1;
     }
 
-    // ---- top-level messages/branches
+    // ---- top-level messages (root stem)
     thread.messages = parse_block(&lines, &mut i, false);
     thread
 }
@@ -49,8 +42,6 @@ pub fn import_frs(path: &str) -> Thread {
     let thread = parse_frs(path);
 
     let mut avatars = load_avatars();
-
-    // collect all avatars in thread
     let mut to_register: Vec<String> = Vec::new();
     collect_avatars(&thread.messages, &mut to_register);
 
@@ -66,10 +57,7 @@ pub fn import_frs(path: &str) -> Thread {
     thread
 }
 
-
-// ------------------
-// Helpers
-// ------------------
+// ------------------ Helpers ------------------
 
 fn parse_block(lines: &[String], i: &mut usize, stop_at_closing_brace: bool) -> Vec<Message> {
     let mut msgs: Vec<Message> = Vec::new();
@@ -91,15 +79,18 @@ fn parse_block(lines: &[String], i: &mut usize, stop_at_closing_brace: bool) -> 
         }
 
         if is_branch_open(line) {
-            *i += 1; // consume
+            *i += 1; // consume "branch {"
             if msgs.is_empty() {
                 eprintln!("❌ branch with no preceding jot at line {}", i);
                 let _ = parse_block(lines, i, true);
                 continue;
             }
-            let children = parse_block(lines, i, true);
+            let children_block = parse_block(lines, i, true); // one branch block
             if let Some(last) = msgs.last_mut() {
-                last.children.extend(children);
+                // Save as a grouped branch
+                last.branches.push(children_block.clone());
+                // Also flatten into children for compatibility
+                last.children.extend(children_block);
             }
             continue;
         }
@@ -135,9 +126,7 @@ fn parse_tags_line(line: &str) -> Option<Vec<String>> {
 fn parse_jot_line(line: &str) -> Option<Message> {
     let mut parts = line.split_whitespace();
     let first = parts.next()?;
-    if first != "jot" {
-        return None;
-    }
+    if first != "jot" { return None; }
     let avatar = parts.next()?.to_string();
 
     if line.contains("--file") {
@@ -146,7 +135,8 @@ fn parse_jot_line(line: &str) -> Option<Message> {
             avatar,
             text: None,
             file: Some(path),
-            children: vec![],
+            children: vec![],   
+            branches: vec![],   
         });
     }
 
@@ -155,13 +145,14 @@ fn parse_jot_line(line: &str) -> Option<Message> {
         avatar,
         text: Some(text),
         file: None,
-        children: vec![],
+        children: vec![],       
+        branches: vec![],       
     })
 }
+
 
 fn extract_quoted(line: &str) -> Option<String> {
     let start = line.find('"')?;
     let end = line[start + 1..].find('"')? + start + 1;
     Some(line[start + 1..end].to_string())
 }
-
