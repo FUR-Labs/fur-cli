@@ -2,6 +2,8 @@
 
 # FUR versioning (ironic/poetic isn't it?)
 .fur
-fur		
+fur/
 
 SHOW.md
+
+example.frs

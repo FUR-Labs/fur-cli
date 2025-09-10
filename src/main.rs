@@ -1,5 +1,6 @@
 mod commands;
 mod utils;
+mod frs;
 
 use clap::{Parser, Subcommand};
 use crate::commands::{
@@ -87,6 +88,14 @@ enum Commands {
 
     /// Print full contents of a markdown-linked message
     Cat(CatArgs),
+
+    /// Import a .frs file
+    Load {
+        #[arg(help = "Path to the .frs file")]
+        path: String,
+    },
+
+
 }
 
 fn main() {
@@ -127,5 +136,12 @@ fn main() {
         Commands::Tree {} => tree::run_tree(),
 
         Commands::Cat(args) => cat::run_cat(args),
+
+        Commands::Load { path } => {
+            let thread = frs::parse_frs(&path);
+            println!("{:#?}", thread);
+        }
     }
+
+
 }
