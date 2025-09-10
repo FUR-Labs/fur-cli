@@ -138,9 +138,12 @@ fn main() {
         Commands::Cat(args) => cat::run_cat(args),
 
         Commands::Load { path } => {
-            let thread = frs::parse_frs(&path);
-            println!("{:#?}", thread);
+            let thread = frs::import_frs(&path); // parse + avatars
+            let thread_id = frs::persist_frs(&thread); // persist into .fur
+            println!("✔️ Saved as thread {}", &thread_id[..8]);
         }
+
+
     }
 
 
