@@ -47,38 +47,76 @@ pub fn run_timeline(args: TimelineArgs) {
 
     println!("🧵 Thread: {}\n", &thread_data["title"]);
 
+    // Enumerate top-level messages as Root 1..N
     for msg_id in messages {
-        let msg_id_str = msg_id.as_str().unwrap();
-        let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id_str));
-        if let Ok(msg_content) = fs::read_to_string(&msg_path) {
-            if let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) {
-                let time = msg_json["timestamp"].as_str().unwrap_or("???");
-                let avatar = msg_json["avatar"].as_str().unwrap_or("🐾");
-                let name = msg_json["name"].as_str().unwrap_or("unknown");
+        if let Some(id_str) = msg_id.as_str() {
+            let path = vec![]; // start empty
+            print_message_recursive(&fur_dir, id_str, 0, &path, &args);
+        }
+    }
+}
 
-                // Handle missing text with a fallback message
-                let text = msg_json["text"].as_str().unwrap_or_else(|| {
-                    if msg_json["markdown"].is_null() {
-                        "No comment"
+/// Pretty-join a path like [1,2,3] -> "1.2.3"
+fn path_str(path: &[usize]) -> String {
+    path.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(".")
+}
+
+/// Recursively print a message and its children, with Root/Branch notation
+fn print_message_recursive(
+    fur_dir: &Path,
+    msg_id: &str,
+    depth: usize,
+    path: &[usize],
+    args: &TimelineArgs,
+) {
+    let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
+    if let Ok(msg_content) = fs::read_to_string(&msg_path) {
+        if let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) {
+            let time = msg_json["timestamp"].as_str().unwrap_or("???");
+            let avatar = msg_json["avatar"].as_str().unwrap_or("🐾");
+            let name = msg_json["name"].as_str().unwrap_or("unknown");
+
+            // Handle missing text with a fallback message
+            let text = msg_json["text"].as_str().unwrap_or_else(|| {
+                if msg_json["markdown"].is_null() {
+                    "No comment"
+                } else {
+                    "No comment, just a file:"
+                }
+            });
+
+            let indent = "    ".repeat(depth);
+            let label = if depth == 0 {
+                "[Root]".to_string()
+            } else {
+                format!("[Branch {}]", path_str(path))
+            };
+
+            println!(
+                "{indent}🕰️  {time} {label} {avatar} [{name}]:\n{indent}{text}\n"
+            );
+
+            // Markdown reference if present
+            if let Some(path_str) = msg_json["markdown"].as_str() {
+                println!("{indent}🔍 Resolving markdown file at: {path_str}");
+                if args.verbose {
+                    if let Ok(contents) = fs::read_to_string(path_str) {
+                        println!("{indent}📄 Linked Markdown Content:\n{contents}");
                     } else {
-                        "No comment, just a file:"
+                        println!("{indent}⚠️ Could not read linked markdown file at: {path_str}");
                     }
-                });
+                } else {
+                    println!("{indent}📂 Linked Markdown file: {path_str}");
+                }
+            }
 
-                println!("🕰️  {} {} [{}]:\n{}\n", time, avatar, name, text);
-
-                // Check for markdown reference
-                if let Some(path_str) = msg_json["markdown"].as_str() {
-                    println!("🔍 Resolving markdown file at: {}", path_str);
-
-                    if args.verbose {
-                        if let Ok(contents) = fs::read_to_string(path_str) {
-                            println!("📄 Linked Markdown Content:\n{}", contents);
-                        } else {
-                            println!("⚠️ Could not read linked markdown file at: {}", path_str);
-                        }
-                    } else {
-                        println!("📂 Linked Markdown file: {}", path_str);
+            // Recurse into children, numbering them
+            if let Some(children) = msg_json["children"].as_array() {
+                for (i, child_id) in children.iter().enumerate() {
+                    if let Some(child_str) = child_id.as_str() {
+                        let mut child_path = path.to_vec();
+                        child_path.push(i + 1); // 1-based numbering
+                        print_message_recursive(fur_dir, child_str, depth + 1, &child_path, args);
                     }
                 }
             }
