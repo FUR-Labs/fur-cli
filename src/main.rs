@@ -10,7 +10,7 @@ use crate::commands::{
     timeline::{self, TimelineArgs},
     fork,
     status,
-    tree,
+    tree::{self, TreeArgs},
     cat::{self, CatArgs},
     save::{run_save, SaveArgs},
 };
@@ -85,8 +85,8 @@ enum Commands {
     Timeline(TimelineArgs),  // Pass verbose flag here
 
     /// Show the thread as a branching tree
-    Tree {},
-
+    Tree(TreeArgs),
+    
     /// Print full contents of a markdown-linked message
     Cat(CatArgs),
 
@@ -135,7 +135,7 @@ fn main() {
 
         Commands::Timeline(args) => timeline::run_timeline(args),  // Pass args here
 
-        Commands::Tree {} => tree::run_tree(),
+        Commands::Tree(args) => tree::run_tree(args),
 
         Commands::Cat(args) => cat::run_cat(args),
 

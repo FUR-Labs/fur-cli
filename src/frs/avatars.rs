@@ -39,6 +39,23 @@ pub fn save_avatars_with_main(avatars: &mut Value, main: &str) {
     }
 }
 
+pub fn resolve_avatar(avatars: &Value, key: &str) -> (String, String) {
+    // If key matches a known avatar name → return (name, emoji)
+    if let Some(emoji) = avatars.get(key).and_then(|v| v.as_str()) {
+        return (key.to_string(), emoji.to_string());
+    }
+
+    // If key looks like an emoji already → reverse-lookup name
+    if let Some((name, _)) = avatars.as_object()
+        .and_then(|map| map.iter().find(|(_, v)| v.as_str() == Some(key)))
+    {
+        return (name.clone(), key.to_string());
+    }
+
+    (key.to_string(), "🐾".to_string()) // fallback
+}
+
+
 pub fn collect_avatars(msgs: &[Message], acc: &mut Vec<String>) {
     for m in msgs {
         if !acc.contains(&m.avatar) {

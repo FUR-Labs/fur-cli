@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use crate::frs::avatars::{resolve_avatar};
 
 pub fn run_status() {
     let fur_dir = Path::new(".fur");
@@ -127,7 +128,7 @@ fn print_lineage(id_to_message: &HashMap<String, Value>, current_msg_id: &str, a
         if let Some(msg) = id_to_message.get(id) {
             let name = msg["name"].as_str().unwrap_or("???");
             let avatar_key = msg["avatar"].as_str().unwrap_or("???");
-            let emoji = avatar_with_emoji(avatars, avatar_key);
+            let (_, emoji) = resolve_avatar(avatars, avatar_key);
             let text = msg.get("text").and_then(|v| v.as_str()).unwrap_or_else(|| {
                 msg.get("markdown")
                     .and_then(|v| v.as_str())
@@ -199,7 +200,7 @@ fn print_next_messages(id_to_message: &HashMap<String, Value>, thread: &Value, c
                 if let Some(msg) = id_to_message.get(&child_id) {
                     let name = msg["name"].as_str().unwrap_or("???");
                     let avatar_key = msg["avatar"].as_str().unwrap_or("???");
-                    let emoji = avatar_with_emoji(avatars, avatar_key);
+                    let (_, emoji) = resolve_avatar(avatars, avatar_key);
                     let text = msg.get("text").and_then(|v| v.as_str()).unwrap_or_else(|| {
                         msg.get("markdown")
                             .and_then(|v| v.as_str())
@@ -221,15 +222,6 @@ fn print_next_messages(id_to_message: &HashMap<String, Value>, thread: &Value, c
     } else {
         println!("(No current message found.)");
     }
-}
-
-/// Map avatar key → emoji
-fn avatar_with_emoji(avatars: &Value, avatar_key: &str) -> String {
-    avatars
-        .get(avatar_key)
-        .and_then(|v| v.as_str())
-        .unwrap_or("🐾")
-        .to_string()
 }
 
 

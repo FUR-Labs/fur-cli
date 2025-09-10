@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
 use clap::Parser;
+use crate::frs::avatars::resolve_avatar;
 
 /// Timeline command structure with verbose flag
 #[derive(Parser)]
@@ -52,16 +54,30 @@ pub fn run_timeline(args: TimelineArgs) {
 
     println!("🧵 Thread: \"{}\"\n", &thread_data["title"]);
 
+    let mut visited = HashSet::new();
+
     // Root messages (stem level)
     for msg_id in messages {
         if let Some(id) = msg_id.as_str() {
-            render_message(&fur_dir, id, "Root".to_string(), args.verbose, &avatars);
+            render_message(&fur_dir, id, "Root".to_string(), args.verbose, &avatars, &mut visited);
         }
     }
 }
 
-/// Recursive renderer (flat, no indentation)
-fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool, avatars: &Value) {
+/// Recursive renderer (flat, no indentation) with visited-set
+fn render_message(
+    fur_dir: &Path,
+    msg_id: &str,
+    label: String,
+    verbose: bool,
+    avatars: &Value,
+    visited: &mut HashSet<String>
+) {
+    if visited.contains(msg_id) {
+        return;
+    }
+    visited.insert(msg_id.to_string());
+
     let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
     let msg_content = match fs::read_to_string(&msg_path) {
         Ok(c) => c,
@@ -75,8 +91,7 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool, av
 
     let time = msg_json["timestamp"].as_str().unwrap_or("???");
     let avatar_key = msg_json["avatar"].as_str().unwrap_or("???");
-    let emoji = avatar_with_emoji(avatars, avatar_key);
-    let name = msg_json["name"].as_str().unwrap_or("unknown");
+    let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
     // Message text or fallback
     let text = msg_json["text"].as_str().unwrap_or_else(|| {
@@ -116,7 +131,7 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool, av
                             } else {
                                 format!("{}.{}", label.replace("Branch ", ""), b_idx + 1)
                             };
-                            render_message(fur_dir, c_id, new_label, verbose, avatars);
+                            render_message(fur_dir, c_id, new_label, verbose, avatars, visited);
                         }
                     }
                 }
@@ -129,17 +144,8 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool, av
     if let Some(children) = msg_json["children"].as_array() {
         for child_id in children {
             if let Some(c_id) = child_id.as_str() {
-                render_message(fur_dir, c_id, label.clone(), verbose, avatars);
+                render_message(fur_dir, c_id, label.clone(), verbose, avatars, visited);
             }
         }
     }
-}
-
-/// Map avatar → emoji
-fn avatar_with_emoji(avatars: &Value, avatar_key: &str) -> String {
-    avatars
-        .get(avatar_key)
-        .and_then(|v| v.as_str())
-        .unwrap_or("🐾")
-        .to_string()
 }
