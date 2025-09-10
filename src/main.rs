@@ -12,6 +12,7 @@ use crate::commands::{
     status,
     tree,
     cat::{self, CatArgs},
+    save::{run_save, SaveArgs},
 };
 
 #[derive(Parser)]
@@ -95,6 +96,7 @@ enum Commands {
         path: String,
     },
 
+    Save(SaveArgs),
 
 }
 
@@ -143,6 +145,7 @@ fn main() {
             println!("✔️ Saved as thread {}", &thread_id[..8]);
         }
 
+        Commands::Save(args) => run_save(args),
 
     }
 
