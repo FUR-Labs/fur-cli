@@ -50,13 +50,13 @@ pub fn run_timeline(args: TimelineArgs) {
     // Root messages (stem level)
     for msg_id in messages {
         if let Some(id) = msg_id.as_str() {
-            render_message(&fur_dir, id, "Root".to_string(), 0, args.verbose);
+            render_message(&fur_dir, id, "Root".to_string(), args.verbose);
         }
     }
 }
 
-/// Recursive renderer
-fn render_message(fur_dir: &Path, msg_id: &str, label: String, depth: usize, verbose: bool) {
+/// Recursive renderer (flat, no indentation)
+fn render_message(fur_dir: &Path, msg_id: &str, label: String, verbose: bool) {
     let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
     let msg_content = match fs::read_to_string(&msg_path) {
         Ok(c) => c,
@@ -81,29 +81,20 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, depth: usize, ver
         }
     });
 
-    let indent = "    ".repeat(depth);
-    println!(
-        "{}🕰️  {} [{}] {} [{}]:\n{}{}\n",
-        indent,
-        time,
-        label,
-        avatar,
-        name,
-        indent,
-        text
-    );
+    println!("🕰️  {} [{}] {} [{}]:", time, label, avatar, name);
+    println!("{}\n", text);
 
     // Markdown linked file
     if let Some(path_str) = msg_json["markdown"].as_str() {
-        println!("{}🔍 Resolving markdown file at: {}", indent, path_str);
+        println!("🔍 Resolving markdown file at: {}", path_str);
         if verbose {
             if let Ok(contents) = fs::read_to_string(path_str) {
-                println!("{}📄 Linked Markdown Content:\n{}", indent, contents);
+                println!("📄 Linked Markdown Content:\n{}", contents);
             } else {
-                println!("{}⚠️ Could not read linked markdown file at: {}", indent, path_str);
+                println!("⚠️ Could not read linked markdown file at: {}", path_str);
             }
         } else {
-            println!("{}📂 Linked Markdown file: {}", indent, path_str);
+            println!("📂 Linked Markdown file: {}", path_str);
         }
     }
 
@@ -115,13 +106,11 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, depth: usize, ver
                     for child_id in branch_arr {
                         if let Some(c_id) = child_id.as_str() {
                             let new_label = if label == "Root" {
-                                // First-level branches
                                 format!("Branch {}", b_idx + 1)
                             } else {
-                                // Nested branches
                                 format!("{}.{}", label.replace("Branch ", ""), b_idx + 1)
                             };
-                            render_message(fur_dir, c_id, new_label, depth + 1, verbose);
+                            render_message(fur_dir, c_id, new_label, verbose);
                         }
                     }
                 }
@@ -134,7 +123,7 @@ fn render_message(fur_dir: &Path, msg_id: &str, label: String, depth: usize, ver
     if let Some(children) = msg_json["children"].as_array() {
         for child_id in children {
             if let Some(c_id) = child_id.as_str() {
-                render_message(fur_dir, c_id, label.clone(), depth + 1, verbose);
+                render_message(fur_dir, c_id, label.clone(), verbose);
             }
         }
     }
