@@ -146,12 +146,12 @@ fn parse_block(
         }
 
         if line.starts_with("jot") {
-            if let Some(msg) = parse_jot_line(line, default_user) {
+            if let Some(msg) = parse_jot_line(lines, i, default_user) {
                 msgs.push(msg);
             }
-            *i += 1;
-            continue;
+            continue; // note: parse_jot_line already advanced `i`
         }
+
 
         if is_branch_open(line) {
             *i += 1; // consume "branch {"
@@ -191,6 +191,47 @@ fn is_branch_open(line: &str) -> bool {
     line == "branch {" || line.starts_with("branch {")
 }
 
+/// Collect multi-line quoted text starting at current line.
+/// Advances `i` until the closing `"` is found.
+fn collect_multiline_quoted(lines: &[String], i: &mut usize) -> Option<String> {
+    let mut buf = String::new();
+    let mut started = false;
+
+    while *i < lines.len() {
+        let line = &lines[*i];
+
+        if !started {
+            // find the first quote
+            if let Some(start) = line.find('"') {
+                started = true;
+                let after = &line[start + 1..];
+                if let Some(end) = after.find('"') {
+                    // opening and closing quote on same line
+                    buf.push_str(&after[..end]);
+                    *i += 1;
+                    return Some(buf);
+                } else {
+                    buf.push_str(after);
+                }
+            }
+        } else {
+            buf.push('\n');
+            if let Some(end) = line.find('"') {
+                buf.push_str(&line[..end]);
+                *i += 1;
+                return Some(buf);
+            } else {
+                buf.push_str(line);
+            }
+        }
+
+        *i += 1;
+    }
+
+    None
+}
+
+
 fn parse_tags_line(line: &str) -> Option<Vec<String>> {
     let start = line.find('[')?;
     let end = line.rfind(']')?;
@@ -208,7 +249,8 @@ fn parse_tags_line(line: &str) -> Option<Vec<String>> {
 /// - `jot --file path` (uses default user)
 /// - `jot ai "text"`
 /// - `jot ai --file LARGE_THESIS.md` (path may be quoted or bare)
-fn parse_jot_line(line: &str, default_avatar: &str) -> Option<Message> {
+fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Option<Message> {
+    let line = &lines[*i];
     let mut parts = line.split_whitespace();
     let first = parts.next()?;
     if first != "jot" {
@@ -220,10 +262,10 @@ fn parse_jot_line(line: &str, default_avatar: &str) -> Option<Message> {
     // Case A: `jot "text..."`  OR  `jot --file path`
     if second == "--file" || second.starts_with('"') {
         if second == "--file" {
-            // Try quoted path first; if none, fall back to last token
             let path = extract_quoted(line)
                 .or_else(|| parts.last().map(|s| s.to_string()))
                 .unwrap_or_default();
+            *i += 1;
             return Some(Message {
                 avatar: default_avatar.to_string(),
                 text: None,
@@ -232,24 +274,28 @@ fn parse_jot_line(line: &str, default_avatar: &str) -> Option<Message> {
                 branches: vec![],
             });
         } else {
-            let text = extract_quoted(line)?;
-            return Some(Message {
-                avatar: default_avatar.to_string(),
-                text: Some(text),
-                file: None,
-                children: vec![],
-                branches: vec![],
-            });
+            // multi-line text case
+            if let Some(text) = collect_multiline_quoted(lines, i) {
+                return Some(Message {
+                    avatar: default_avatar.to_string(),
+                    text: Some(text),
+                    file: None,
+                    children: vec![],
+                    branches: vec![],
+                });
+            } else {
+                return None;
+            }
         }
     }
 
     // Case B: `jot ai ...`
     let avatar = second.to_string();
     if line.contains("--file") {
-        // Try quoted first; if missing quotes, use last token as path
         let path = extract_quoted(line)
             .or_else(|| line.split_whitespace().last().map(|s| s.to_string()))
             .unwrap_or_default();
+        *i += 1;
         return Some(Message {
             avatar,
             text: None,
@@ -259,15 +305,19 @@ fn parse_jot_line(line: &str, default_avatar: &str) -> Option<Message> {
         });
     }
 
-    let text = extract_quoted(line)?;
-    Some(Message {
-        avatar,
-        text: Some(text),
-        file: None,
-        children: vec![],
-        branches: vec![],
-    })
+    if let Some(text) = collect_multiline_quoted(lines, i) {
+        Some(Message {
+            avatar,
+            text: Some(text),
+            file: None,
+            children: vec![],
+            branches: vec![],
+        })
+    } else {
+        None
+    }
 }
+
 
 fn extract_quoted(line: &str) -> Option<String> {
     let start = line.find('"')?;

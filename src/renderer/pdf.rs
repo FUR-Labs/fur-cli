@@ -67,7 +67,7 @@ pub fn render_message_tex(
 
     // Escape LaTeX special characters
     let escape = |s: &str| {
-        s.replace("&", "\\&")
+            s.replace("&", "\\&")
             .replace("%", "\\%")
             .replace("$", "\\$")
             .replace("#", "\\#")
@@ -76,9 +76,11 @@ pub fn render_message_tex(
             .replace("}", "\\}")
             .replace("~", "\\textasciitilde{}")
             .replace("^", "\\textasciicircum{}")
+            .replace("\n", " \\\\\n")
     };
 
-    // Handle message content
+
+    // Handle message content safely
     let base_content = if args.verbose || args.contents {
         if let Some(path_str) = msg.markdown.clone() {
             match Command::new("pandoc")
@@ -88,28 +90,29 @@ pub fn render_message_tex(
                 Ok(output) if output.status.success() => {
                     let latex_body = String::from_utf8_lossy(&output.stdout);
                     format!(
-                        "Attached document:\n\n\\begin{{quote}}\n{}\n\\end{{quote}}\\clearpage",
-                        strip_emojis(&latex_body)
+                        "Attached document:\n\n\\begin{{quote}}\n{}\n\\end{{quote}}\n\\clearpage",
+                        strip_emojis(&latex_body) // ⚠️ no escape here — Pandoc is already LaTeX
                     )
                 }
+
                 _ => {
                     fs::read_to_string(path_str)
                         .map(|s| escape(&strip_emojis(&s)))
-                        .unwrap_or(strip_emojis(&msg.text))
+                        .unwrap_or_else(|_| escape(&strip_emojis(&msg.text)))
                 }
             }
         } else {
-            strip_emojis(&msg.text)
+            escape(&strip_emojis(&msg.text))
         }
     } else {
-        strip_emojis(&msg.text)
+        escape(&strip_emojis(&msg.text))
     };
 
     // Instead of indentation, show branch label explicitly
     writeln!(
         tex_out,
         "\\MessageBlock{{{}}}{{{} {} - {}}}{{{}}}",
-        msg.name,
+        escape(&msg.name),
         msg.date_str,
         msg.time_str,
         label,
