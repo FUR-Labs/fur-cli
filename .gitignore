@@ -10,7 +10,6 @@ SHOW.md
 
 # tests dev
 example*.frs
-examples_chats
 
 # tex and auxiliary
 *.tex

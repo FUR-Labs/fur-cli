@@ -32,6 +32,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Generate shell completions
+    #[command(hide = true)]
     Completions {
         #[arg(value_parser = ["bash", "zsh", "fish"])]
         shell: String,
@@ -73,6 +74,10 @@ enum Commands {
         /// ID of the message to fork from (optional)
         #[arg(short, long, default_value = "")]
         id: String,
+
+        /// Optional custom title for the new fork
+        #[arg(short, long)]
+        title: Option<String>,
     },
 
     /// Jump to another message in the thread
@@ -125,11 +130,11 @@ fn main() {
             thread::run_thread(args);
         }
 
-        Commands::Fork { id } => {
+        Commands::Fork { id, title } => {
             if id.is_empty() {
-                fork::run_fork_from_active()
+                fork::run_fork_from_active(title.clone());
             } else {
-                fork::run_fork(&id)
+                fork::run_fork(&id, title.clone());
             }
         }
 
