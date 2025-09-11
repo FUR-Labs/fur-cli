@@ -1,0 +1,32 @@
+
+new "Quantum Playground"
+tags = ["quantum computing", "research", "future"]
+
+user = andrew 
+
+# Kickoff
+jot "Explain quantum entanglement in a way that makes my brain melt."
+
+jot gpt5 "Entanglement is like two particles sharing one soul — measure one, and the other instantly reacts, no matter the distance."
+
+# Branch into different vibes
+branch {
+  jot "Now make it sound cinematic."
+  jot claude --file chats/CINEMATIC_ENTANGLEMENT.md
+}
+
+branch {
+  jot "Give me math. Beautiful math."
+  jot gemini --file chats/ENTANGLEMENT_EQS.md
+}
+
+branch {
+  jot "Okay, now pitch it like a startup idea."
+  jot gpt5 --file chats/QUANTUM_STARTUP_PITCH.md
+}
+
+# Merge into a one-pager manifesto
+branch {
+  jot "Summarize all this into something that would impress a VC."
+  jot claude --file chats/QUANTUM_MANIFESTO.md
+}

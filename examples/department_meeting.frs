@@ -1,0 +1,37 @@
+new "Department Monthly Check-In"
+tags = ["meeting", "status", "internal"]
+
+user = carla_branch_manager
+
+jot "Good morning, everyone. Thanks for joining the monthly check-in."
+jot james_secretary "Morning. I’ll be taking notes as usual."
+jot linda_finance "Morning."
+jot omar_operations "Good morning."
+jot sophia_hr "Morning, Carla."
+
+jot carla_branch_manager "Let’s begin with finance. Linda, could you give us an overview?"
+jot linda_finance "Yes. Expenses are aligned with projections, but there’s a minor variance in travel costs. Nothing critical, but we should monitor it going forward."
+jot carla_branch_manager "Understood. Please flag anything over 5% variance for next time."
+
+jot carla_branch_manager "Omar, how are operations this month?"
+jot omar_operations "Staffing is stable, though scheduling remains tight. Equipment maintenance is on track, but we have a pending vendor contract renewal."
+jot carla_branch_manager "Thanks. Let’s make sure procurement has visibility on that."
+
+jot carla_branch_manager "Sophia, how’s HR?"
+jot sophia_hr "We’ve completed the compliance training rollout. Participation was 95%, which is better than expected. We’re drafting new onboarding guidelines for next quarter."
+jot carla_branch_manager "Good. Please coordinate with James to ensure those guidelines are circulated."
+
+jot carla_branch_manager "James, could you summarize key points and share the report?"
+jot james_secretary --file docs/MONTHLY_SUMMARY_REPORT.md
+
+jot linda_finance "Thanks, James. That will be useful for the audit prep."
+jot omar_operations "I’ll also forward the report to the facilities team."
+jot sophia_hr "Appreciate it — I’ll attach it to the HR records."
+
+jot carla_branch_manager "Before we close, does anyone have additional items?"
+jot linda_finance "Nothing further from finance."
+jot omar_operations "No updates from operations."
+jot sophia_hr "HR is clear for now."
+jot james_secretary "All noted in the minutes."
+
+jot carla_branch_manager "Excellent. Thank you, everyone. Let’s reconvene next month at the same time."

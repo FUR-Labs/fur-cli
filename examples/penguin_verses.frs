@@ -1,0 +1,66 @@
+new "The Penguin Verses"
+tags = ["aliens", "penguins", "cosmic nonsense"]
+# info: notes while stranded in a strange planet 
+
+user = commander
+
+# The first shy exchange
+jot "H-hello? Who’s out there...?"
+jot pengu "meep."
+
+branch {
+  jot "Wait... are you... a penguin?"
+  jot pengu "*penguin sounds* ... meep."
+
+  branch {
+    jot "Uh, I come in peace."
+    jot pengu "meep... peace acknowledged."
+  }
+
+  branch {
+    jot "What do you want from me?"
+    jot pengu "meep. knowledge."
+  }
+}
+
+# The alien language begins
+branch {
+  jot "I don’t understand your meeps..."
+  jot pengu "MEEP’th ∑∑∑(Ω·Δ) ≈ framtíð waddle collapse"
+  
+  branch {
+    jot "What is that? Math?"
+    jot pengu --file chats/MEEPONOMICON.md
+  }
+
+  branch {
+    jot "Those symbols... they look like physics?"
+    jot pengu "Meeepurrð skvääl fjǫrðr thrymm… Ω~Δ squawk! ⧉⧉⧉"
+  }
+}
+
+# Penguin gospel escalates
+branch {
+  jot "Okay, but what are you trying to tell me?"
+  jot pengu "Meeep. 🐧🌀 urðr waddlë fractal…"
+
+  branch {
+    jot "Waddle field... collapse?"
+    jot pengu --file chats/THE_FINAL_POUND.md
+  }
+
+  branch {
+    jot "I think you’re joking..."
+    jot pengu "NO. MEEP SERIOUS.  
+    Þrym vǫddl skugg ∂ømrr… squaakkk fjǫrrdr oscillat…"
+  }
+}
+
+# The final verse
+branch {
+  jot "Even if the symbols escape me, I feel the truth in their rhythm."
+  jot pengu "Meeep… last chant… urðr glòrzz valgrind…"
+
+  jot pengu "∑ meeep³ + fjǫrðr^2 → ⧉⧉⧉ collapse.  
+  MEEP. THE END. 🐧"
+}

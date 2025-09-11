@@ -1,0 +1,28 @@
+new "Dad Jokes"
+tags = ["humor"]
+
+user = anonymous
+
+jot "Tell me a joke."
+jot dadbot "Why did the chicken cross the road?"
+
+branch {
+  jot "To get to the other side?"
+  jot dadbot "Classic dad energy."
+
+  branch {
+    jot "Not a dad, just broken."
+    jot dadbot "Understandable. Have a nice cry."
+  }
+
+  branch {
+    jot "Yes, six kids."
+    jot dadbot "Statistically inevitable — you were destined for minivan ownership."
+  }
+  
+}
+
+branch {
+  jot "No idea, why?"
+  jot dadbot "To escape the algorithm."
+}
