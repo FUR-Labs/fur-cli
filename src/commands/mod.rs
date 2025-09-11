@@ -7,5 +7,4 @@ pub mod status;
 pub mod thread;
 pub mod jump;
 pub mod tree;
-pub mod cat;
 pub mod save;

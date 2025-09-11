@@ -1,6 +1,5 @@
 mod commands;
 mod renderer;
-mod utils;
 mod frs;
 
 use clap::{Parser, Subcommand, CommandFactory};
@@ -14,7 +13,6 @@ use crate::commands::{
     fork,
     status,
     tree::{self, TreeArgs},
-    cat::{self, CatArgs},
     save::{self, SaveArgs},
     new,
     thread,
@@ -91,9 +89,6 @@ enum Commands {
     /// Show the thread as a branching tree
     Tree(TreeArgs),
 
-    /// Print full contents of a markdown-linked message
-    Cat(CatArgs),
-
     /// Import a .frs file
     Load {
         #[arg(help = "Path to the .frs file")]
@@ -149,8 +144,6 @@ fn main() {
         Commands::Timeline(args) => timeline::run_timeline(args),  // Pass args here
 
         Commands::Tree(args) => tree::run_tree(args),
-
-        Commands::Cat(args) => cat::run_cat(args),
 
         Commands::Load { path } => {
             let thread = frs::import_frs(&path);
