@@ -1,10 +1,25 @@
 use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
+use clap::Parser;
 
-pub fn run_thread(view: bool, id: Option<String>) {
+/// Arguments for the `thread` command
+#[derive(Parser)]
+pub struct ThreadArgs {
+    /// Thread ID or prefix to switch
+    pub id: Option<String>,
+
+    /// View all threads
+    #[arg(long)]
+    pub view: bool,
+}
+
+
+/// Main entry point for the `thread` command
+pub fn run_thread(args: ThreadArgs) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
+
     if !index_path.exists() {
         eprintln!("🚨 .fur/ not found. Run `fur new` first.");
         return;
@@ -16,7 +31,7 @@ pub fn run_thread(view: bool, id: Option<String>) {
     // ------------------------
     // VIEW ALL THREADS
     // ------------------------
-    if view {
+    if args.view {
         println!("📇 Threads in .fur:");
 
         let empty_vec: Vec<Value> = Vec::new();
@@ -41,9 +56,8 @@ pub fn run_thread(view: bool, id: Option<String>) {
     // ------------------------
     // SWITCH ACTIVE THREAD
     // ------------------------
-    if let Some(tid) = id {
+    if let Some(tid) = args.id {
         let empty_vec: Vec<Value> = Vec::new();
-        // 👇 Copy thread IDs into an owned Vec<String>
         let threads: Vec<String> = index["threads"]
             .as_array()
             .unwrap_or(&empty_vec)

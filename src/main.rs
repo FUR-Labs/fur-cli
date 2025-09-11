@@ -2,7 +2,9 @@ mod commands;
 mod utils;
 mod frs;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, CommandFactory};
+use clap_complete::{generate, shells::{Bash, Zsh, Fish}};
+use std::io;
 use crate::commands::{
     avatar,
     jot::{self, JotArgs},
@@ -12,7 +14,9 @@ use crate::commands::{
     status,
     tree::{self, TreeArgs},
     cat::{self, CatArgs},
-    save::{run_save, SaveArgs},
+    save::{self, SaveArgs},
+    new,
+    thread,
 };
 
 #[derive(Parser)]
@@ -28,11 +32,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Generate shell completions
+    Completions {
+        #[arg(value_parser = ["bash", "zsh", "fish"])]
+        shell: String,
+    },
+
+    /// Manage avatars
     Avatar {
         /// The name of the avatar (e.g., "james", "ai", "girlfriend")
-        avatar: Option<String>,  // becomes optional
+        avatar: Option<String>,
 
-        /// Flag for creating non-main avatars (e.g., "ai", "girlfriend")
+        /// Flag for creating non-main avatars
         #[arg(short, long)]
         other: bool,
 
@@ -40,9 +51,9 @@ enum Commands {
         #[arg(short, long)]
         emoji: Option<String>,
 
-        /// See all your avatars
+        /// View all avatars
         #[arg(long)]
-        view: bool, 
+        view: bool,
     },
 
     /// Start a new conversation
@@ -55,14 +66,8 @@ enum Commands {
     Status {},
 
     /// Manage threads (list or switch)
-    Thread {
-        /// Show all threads
-        #[arg(long)]
-        view: bool,
+    Thread(thread::ThreadArgs),
 
-        /// Switch to a specific thread ID
-        id: Option<String>,
-    },
 
     /// Fork the current message into a new thread
     Fork {
@@ -72,8 +77,6 @@ enum Commands {
     },
 
     /// Jump to another message in the thread
-    ///
-    /// You can go back (past), forward (child), or jump to a specific ID.
     Jump(JumpArgs),
 
     /// Add a new message or link a markdown file
@@ -86,7 +89,7 @@ enum Commands {
 
     /// Show the thread as a branching tree
     Tree(TreeArgs),
-    
+
     /// Print full contents of a markdown-linked message
     Cat(CatArgs),
 
@@ -96,25 +99,34 @@ enum Commands {
         path: String,
     },
 
+    /// Save threads/messages
     Save(SaveArgs),
-
 }
 
 fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Completions { shell } => {
+            let mut cmd = Cli::command();
+            match shell.as_str() {
+                "bash" => generate(Bash, &mut cmd, "fur", &mut io::stdout()),
+                "zsh"  => generate(Zsh,  &mut cmd, "fur", &mut io::stdout()),
+                "fish" => generate(Fish, &mut cmd, "fur", &mut io::stdout()),
+                _ => eprintln!("Unsupported shell: {}", shell),
+            }
+        }
+
         Commands::Avatar { avatar, other, emoji, view } => {
-            // Wrap emoji in Some() before passing to run_avatar
             avatar::run_avatar(avatar, other, emoji, view);
         }
 
-        Commands::New { name } => commands::new::run_new(name),
+        Commands::New { name } => new::run_new(name),
 
         Commands::Status {} => status::run_status(),
 
-        Commands::Thread { view, id } => {
-            commands::thread::run_thread(view, id);
+        Commands::Thread(args) => {
+            thread::run_thread(args);
         }
 
         Commands::Fork { id } => {
@@ -140,14 +152,11 @@ fn main() {
         Commands::Cat(args) => cat::run_cat(args),
 
         Commands::Load { path } => {
-            let thread = frs::import_frs(&path); // parse + avatars
-            let thread_id = frs::persist_frs(&thread); // persist into .fur
+            let thread = frs::import_frs(&path);
+            let thread_id = frs::persist_frs(&thread);
             println!("✔️ Saved as thread {}", &thread_id[..8]);
         }
 
-        Commands::Save(args) => run_save(args),
-
+        Commands::Save(args) => save::run_save(args),
     }
-
-
 }
