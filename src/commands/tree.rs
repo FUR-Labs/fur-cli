@@ -1,10 +1,10 @@
-use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use serde_json::{Value, json};
+use serde_json::Value;
 use clap::Parser;
-
-use crate::frs::avatars::{resolve_avatar};
+use std::collections::HashMap;
+use crate::frs::avatars::resolve_avatar;
+use colored::*;
 
 #[derive(Parser)]
 pub struct TreeArgs {}
@@ -14,106 +14,158 @@ pub fn run_tree(_args: TreeArgs) {
     let index_path = fur_dir.join("index.json");
 
     if !index_path.exists() {
-        eprintln!("🚨 .fur/ not found. Run `fur new` first.");
+        eprintln!("{}", "🚨 .fur/ not found. Run `fur new` first.".red().bold());
         return;
     }
 
-    // Load index + thread
-    let index_data: Value = serde_json::from_str(
-        &fs::read_to_string(&index_path).expect("Cannot read index.json")
-    ).unwrap();
+    // Load index and thread
+    let index_data: Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).expect("❌ Cannot read index.json"))
+            .unwrap();
 
-    let thread_id = index_data["active_thread"].as_str().unwrap();
+    let thread_id = index_data["active_thread"].as_str().unwrap_or("❓");
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    let thread_data: Value = serde_json::from_str(
-        &fs::read_to_string(&thread_path).expect("Cannot read thread")
-    ).unwrap();
+    let thread_data: Value =
+        serde_json::from_str(&fs::read_to_string(&thread_path).expect("❌ Cannot read thread"))
+            .unwrap();
 
-    // Load avatars
+    // Load avatars.json once
     let avatars: Value = serde_json::from_str(
         &fs::read_to_string(fur_dir.join("avatars.json")).unwrap_or_else(|_| "{}".to_string())
-    ).unwrap_or(json!({}));
+    ).unwrap_or(serde_json::json!({}));
 
-    println!("🌳 Thread Tree: \"{}\"\n", &thread_data["title"]);
+    println!(
+        "{} {}",
+        "🌳 Thread Tree:".bold().cyan(),
+        thread_data["title"].as_str().unwrap_or("Untitled").green().bold()
+    );
 
-    // Root messages
-    let empty = vec![];
-    let messages = thread_data["messages"].as_array().unwrap_or(&empty);
-
-    let mut visited = HashSet::new();
-
-    for msg_id in messages {
-        if let Some(id) = msg_id.as_str() {
-            render_message(&fur_dir, id, "Root".to_string(), "", &avatars, &mut visited);
+    if let Some(messages) = thread_data["messages"].as_array() {
+        let id_to_message = build_id_to_message(&fur_dir, &thread_data);
+        for (idx, msg_id) in messages.iter().enumerate() {
+            if let Some(mid) = msg_id.as_str() {
+                render_message(&id_to_message, mid, "", idx == messages.len() - 1, &avatars);
+            }
         }
     }
 }
 
-/// Recursive renderer with visited-set
-fn render_message(
-    fur_dir: &Path,
-    msg_id: &str,
-    label: String,
-    prefix: &str,
-    avatars: &Value,
-    visited: &mut HashSet<String>
-) {
-    // Skip if already visited
-    if visited.contains(msg_id) {
-        return;
-    }
-    visited.insert(msg_id.to_string());
+/// Preload all messages into a HashMap
+fn build_id_to_message(fur_dir: &Path, thread: &Value) -> HashMap<String, Value> {
+    let mut id_to_message = HashMap::new();
+    let mut to_visit: Vec<String> = thread["messages"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|id| id.as_str().map(|s| s.to_string()))
+        .collect();
 
-    // Load message
-    let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
-    let msg_content = match fs::read_to_string(&msg_path) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-
-    let msg_json: Value = match serde_json::from_str(&msg_content) {
-        Ok(v) => v,
-        Err(_) => return,
-    };
-
-    let text = msg_json["text"].as_str().unwrap_or_else(|| {
-        if msg_json["markdown"].is_null() {
-            "<no content>"
-        } else {
-            "📄 file"
+    while let Some(mid) = to_visit.pop() {
+        let path = fur_dir.join("messages").join(format!("{}.json", mid));
+        if let Ok(content) = fs::read_to_string(path) {
+            if let Ok(json) = serde_json::from_str::<Value>(&content) {
+                // enqueue children + branches
+                if let Some(children) = json["children"].as_array() {
+                    for c in children {
+                        if let Some(cid) = c.as_str() {
+                            to_visit.push(cid.to_string());
+                        }
+                    }
+                }
+                if let Some(branches) = json["branches"].as_array() {
+                    for block in branches {
+                        if let Some(arr) = block.as_array() {
+                            for c in arr {
+                                if let Some(cid) = c.as_str() {
+                                    to_visit.push(cid.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+                id_to_message.insert(mid.clone(), json);
+            }
         }
-    });
+    }
+    id_to_message
+}
 
-    let avatar_key = msg_json["avatar"].as_str().unwrap_or("???");
-    let (name, emoji) = resolve_avatar(avatars, avatar_key);
+/// Recursive tree renderer
+fn render_message(
+    id_to_message: &HashMap<String, Value>,
+    msg_id: &str,
+    prefix: &str,
+    is_last: bool,
+    avatars: &Value,
+) {
+    if let Some(msg) = id_to_message.get(msg_id) {
+        // build tree connector
+        let branch_symbol = if is_last { "└──" } else { "├──" };
+        let tree_prefix = format!("{}{}", prefix, branch_symbol.bright_green());
 
-    println!("{}├── [{}] {} [{}]: {}", prefix, label, emoji, name, text);
+        let avatar_key = msg["avatar"].as_str().unwrap_or("???");
+        let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
-    // Prepare deeper prefix
-    let new_prefix = format!("{}│   ", prefix);
+        let text = msg.get("text").and_then(|v| v.as_str()).unwrap_or_else(|| {
+            msg.get("markdown")
+                .and_then(|v| v.as_str())
+                .unwrap_or("<no content>")
+        });
 
-    // Branch-aware recursion
-    if let Some(branches) = msg_json["branches"].as_array() {
+        let id_display = msg_id[..8].to_string();
+
+        if msg.get("markdown").is_some() {
+            println!(
+                "{} {} {} {} {} {}",
+                tree_prefix,
+                "[Root]".cyan(),
+                emoji.yellow(),
+                format!("[{}]", name).bright_yellow(),
+                text.white(),
+                format!("📄 {}", id_display).magenta()
+            );
+        } else {
+            println!(
+                "{} {} {} {} {}",
+                tree_prefix,
+                "[Root]".cyan(),
+                emoji.yellow(),
+                format!("[{}]", name).bright_yellow(),
+                format!("{} {}", text.white(), id_display.bright_black())
+            );
+        }
+
+        // Lifetime-safe empty vec
+        let empty: Vec<Value> = Vec::new();
+        let children = msg["children"].as_array().unwrap_or(&empty);
+        let branches = msg["branches"].as_array().unwrap_or(&empty);
+
+        // merge both: if branches exist, prefer them
         if !branches.is_empty() {
-            for (b_idx, branch) in branches.iter().enumerate() {
-                if let Some(branch_arr) = branch.as_array() {
-                    for child_id in branch_arr {
-                        if let Some(c_id) = child_id.as_str() {
-                            let new_label = format!("{}.{}", label.replace("Branch ", ""), b_idx + 1);
-                            render_message(fur_dir, c_id, new_label, &new_prefix, avatars, visited);
+            for (_b_idx, branch) in branches.iter().enumerate() {
+                if let Some(arr) = branch.as_array() {
+                    for (i, child_id) in arr.iter().enumerate() {
+                        if let Some(cid) = child_id.as_str() {
+                            let new_prefix = format!(
+                                "{}{}   ",
+                                prefix,
+                                if is_last { "    " } else { "│  " }.bright_green()
+                            );
+                            render_message(id_to_message, cid, &new_prefix, i == arr.len() - 1, avatars);
                         }
                     }
                 }
             }
-            return; // ✅ don’t fall back to children if branches exist
-        }
-    }
-
-    // Legacy children
-    if let Some(children) = msg_json["children"].as_array() {
-        for child_id in children {
-            if let Some(c_id) = child_id.as_str() {
-                render_message(fur_dir, c_id, label.clone(), &new_prefix, avatars, visited);
+        } else {
+            for (i, child_id) in children.iter().enumerate() {
+                if let Some(cid) = child_id.as_str() {
+                    let new_prefix = format!(
+                        "{}{}   ",
+                        prefix,
+                        if is_last { "    " } else { "│  " }.bright_green()
+                    );
+                    render_message(id_to_message, cid, &new_prefix, i == children.len() - 1, avatars);
+                }
             }
         }
     }

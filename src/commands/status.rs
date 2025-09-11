@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use colored::*;
 use crate::frs::avatars::resolve_avatar;
 
 pub fn run_status() {
@@ -9,7 +10,7 @@ pub fn run_status() {
     let index_path = fur_dir.join("index.json");
 
     if !index_path.exists() {
-        eprintln!("🚨 .fur/ not found. Run `fur new` first.");
+        eprintln!("{}", "🚨 .fur/ not found. Run `fur new` first.".red().bold());
         return;
     }
 
@@ -33,21 +34,27 @@ pub fn run_status() {
         }
     }
 
-    println!("🧠 Current FUR Status");
-    println!("─────────────────────────────");
+    // Active thread
     println!(
-        "📌 Active thread: {} ({})",
-        thread["title"].as_str().unwrap_or("Untitled"),
-        index["active_thread"].as_str().unwrap_or("?")
+        "{} {} {}",
+        "Active thread:".bright_cyan().bold(),
+        thread["title"].as_str().unwrap_or("Untitled").bright_green().bold(),
+        format!("({})", index["active_thread"].as_str().unwrap_or("?")).bright_black()
     );
-    println!("🧭 Current message: {}", current_msg_id);
-    println!("─────────────────────────────");
+
+    // Current message
+    println!(
+        "{} {}",
+        "Current message:".bright_cyan().bold(),
+        current_msg_id.bright_black() // hash dim gray
+    );
+    println!("{}", "─────────────────────────────".bright_black());
 
     // Print lineage (ancestors)
     print_lineage(&id_to_message, &current_msg_id, &avatars);
 
-    println!("─────────────────────────────");
-    println!("Next messages from here:");
+    println!("{}", "─────────────────────────────".bright_black());
+    println!("{}", "Next messages from here:".bright_magenta().bold());
 
     // Print children/siblings
     print_next_messages(&id_to_message, &thread, &current_msg_id, &avatars);
@@ -135,14 +142,30 @@ fn print_lineage(id_to_message: &HashMap<String, Value>, current_msg_id: &str, a
             });
 
             let preview = text.lines().next().unwrap_or("").chars().take(40).collect::<String>();
-            let marker = if *id == current_msg_id { "🧭 (current)" } else { "✅" };
+            let marker = if *id == current_msg_id { "(current)".cyan().bold() } else { "✅".green() };
             let id_display = &id[..8];
             let branch_label = compute_branch_label(id, id_to_message);
 
             if msg.get("markdown").is_some() {
-                println!("{preview} {emoji} [{name}] 📄 {id_display} {branch_label} {marker}");
+                println!(
+                    "{} {} {} {} {} {}",
+                    preview.white(),
+                    emoji,
+                    format!("[{}]", name).bright_yellow().bold(),
+                    id_display.bright_black(),
+                    branch_label.bright_green(),
+                    marker
+                );
             } else {
-                println!("{preview} {emoji} [{name}] {id_display} {branch_label} {marker}");
+                println!(
+                    "{} {} {} {} {} {}",
+                    preview.white(),
+                    emoji,
+                    format!("[{}]", name).bright_yellow().bold(),
+                    id_display.bright_black(),
+                    branch_label.bright_green(),
+                    marker
+                );
             }
         }
     }
@@ -193,7 +216,7 @@ fn print_next_messages(id_to_message: &HashMap<String, Value>, thread: &Value, c
         }
 
         if next_ids.is_empty() {
-            println!("(No further messages in this branch.)");
+            println!("{}", "(No further messages in this branch.)".bright_black());
         } else {
             for child_id in next_ids {
                 if let Some(msg) = id_to_message.get(&child_id) {
@@ -209,29 +232,30 @@ fn print_next_messages(id_to_message: &HashMap<String, Value>, thread: &Value, c
                     let id_display = &child_id[..8];
                     let branch_label = compute_branch_label(&child_id, id_to_message);
 
-                    if msg.get("markdown").is_some() {
-                        println!("🔹 {preview} {emoji} [{name}] 📄 {id_display} {branch_label}");
-                    } else {
-                        println!("🔹 {preview} {emoji} [{name}] {id_display} {branch_label}");
-                    }
+                    println!(
+                        "🔹 {} {} {} {} {}",
+                        preview.white(),
+                        emoji,
+                        format!("[{}]", name).bright_yellow().bold(),
+                        id_display.bright_black(),
+                        branch_label.bright_green()
+                    );
                 }
             }
         }
     } else {
-        println!("(No current message found.)");
+        println!("{}", "(No current message found.)".red());
     }
 }
 
 /// Walks backwards from a message to compute its branch path label
 fn compute_branch_label(msg_id: &str, id_to_message: &HashMap<String, Value>) -> String {
-    // climb up until root, accumulating indices
     let mut labels = vec![];
     let mut current_id = msg_id;
 
     while let Some(msg) = id_to_message.get(current_id) {
         if let Some(parent_id) = msg["parent"].as_str() {
             if let Some(parent) = id_to_message.get(parent_id) {
-                // Check if in branches
                 if let Some(branches) = parent["branches"].as_array() {
                     for (b_idx, branch) in branches.iter().enumerate() {
                         if let Some(arr) = branch.as_array() {

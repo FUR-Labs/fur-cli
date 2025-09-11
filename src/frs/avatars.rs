@@ -68,8 +68,42 @@ pub fn collect_avatars(msgs: &[Message], acc: &mut Vec<String>) {
     }
 }
 
+/// Return true if the name clearly looks like a bot/LLM.
+fn is_bot_name(name: &str) -> bool {
+    let n = name.to_lowercase();
+
+    // lean markers (substring is fine for most)
+    const MARKERS: [&str; 8] = [
+        "gpt", "claude", "gemini", "bard", "grok", "bot", "ai", "llm",
+    ];
+
+    // fast path: any simple substring marker
+    if MARKERS.iter().any(|m| n.contains(m)) {
+        return true;
+    }
+
+    // safer whole-word match for "agent" (avoid hitting "management")
+    if n.split(|c: char| !c.is_alphanumeric())
+        .any(|tok| tok == "agent")
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Emoji selection for new/unknown avatars:
+/// - Fox stays reserved for main via your `save_avatars_with_main`
+/// - Bots → 🤖
+pub fn get_random_emoji_for_name(name: &str) -> String {
+    if is_bot_name(name) {
+        return "🤖".to_string();
+    }
+    let pool = ["👤"];
+    pool.choose(&mut rand::rng()).unwrap_or(&"👔").to_string()
+}
+
+// Back-compat wrapper (if you still call `get_random_emoji()` without a name)
 pub fn get_random_emoji() -> String {
-    let emojis = ["👹", "🐵", "🐧", "🐺", "🦁", "🦊"];
-    let mut rng = rand::rng();
-    emojis.choose(&mut rng).unwrap_or(&"🐾").to_string()
+    get_random_emoji_for_name("")
 }
