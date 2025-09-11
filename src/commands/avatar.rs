@@ -4,7 +4,8 @@ use serde_json::json;
 pub fn run_avatar(avatar: Option<String>, other: bool, emoji: Option<String>, view: bool) {
     let mut avatars = load_avatars();
 
-    if view {
+    // ✅ Default to view if --view flag OR no avatar name provided
+    if view || avatar.is_none() {
         println!("📇 Avatars:");
         for (name, emoji) in avatars.as_object().unwrap_or(&serde_json::Map::new()) {
             if name == "main" {
@@ -16,13 +17,7 @@ pub fn run_avatar(avatar: Option<String>, other: bool, emoji: Option<String>, vi
         return;
     }
 
-    let avatar = match avatar {
-        Some(a) => a,
-        None => {
-            eprintln!("❌ No avatar name provided. Use `fur avatar <name>` or `--view`.");
-            return;
-        }
-    };
+    let avatar = avatar.unwrap();
 
     if !other {
         let e = emoji.unwrap_or_else(|| "🦊".to_string());

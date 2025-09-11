@@ -14,7 +14,6 @@ pub struct ThreadArgs {
     pub view: bool,
 }
 
-
 /// Main entry point for the `thread` command
 pub fn run_thread(args: ThreadArgs) {
     let fur_dir = Path::new(".fur");
@@ -31,7 +30,7 @@ pub fn run_thread(args: ThreadArgs) {
     // ------------------------
     // VIEW ALL THREADS
     // ------------------------
-    if args.view {
+    if args.view || args.id.is_none() {
         println!("📇 Threads in .fur:");
 
         let empty_vec: Vec<Value> = Vec::new();
@@ -102,7 +101,5 @@ pub fn run_thread(args: ThreadArgs) {
         let title = thread_json["title"].as_str().unwrap_or("Untitled");
 
         println!("✔️ Switched active thread to {} \"{}\"", &tid_full[..8], title);
-    } else {
-        eprintln!("❌ Provide --view or a thread ID to switch.");
     }
 }

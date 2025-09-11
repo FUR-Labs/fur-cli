@@ -10,7 +10,7 @@ use chrono::{DateTime, FixedOffset, Local};
 #[derive(Parser)]
 pub struct TimelineArgs {
     /// Whether to show full content of Markdown files
-    #[arg(short, long)]
+    #[arg(short, long, alias = "contents")]
     pub verbose: bool,
 }
 
