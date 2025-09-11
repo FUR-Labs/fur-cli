@@ -1,4 +1,5 @@
 mod commands;
+mod renderer;
 mod utils;
 mod frs;
 

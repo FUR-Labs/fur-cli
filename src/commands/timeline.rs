@@ -1,12 +1,14 @@
 use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
-use chrono::{DateTime, FixedOffset, Local};
-use colored::*;
 use clap::Parser;
-use genpdf::{Document, Element, elements, fonts, style};
+use genpdf::{Document, elements, fonts, style, Element};
 
-use crate::frs::avatars::resolve_avatar;
+use crate::renderer::{
+    terminal::render_message,
+    markdown::render_message_md,
+    pdf::render_message_pdf,
+};
 
 /// Args for timeline command
 #[derive(Parser)]
@@ -24,9 +26,11 @@ pub struct TimelineArgs {
     pub out: Option<String>,
 }
 
+/// Load embedded LiberationSans font family
 fn embedded_font_family() -> fonts::FontFamily<fonts::FontData> {
     let try_load = |bytes: &'static [u8]| {
-        fonts::FontData::new(bytes.to_vec(), None).expect("Failed to load embedded font")
+        fonts::FontData::new(bytes.to_vec(), None)
+            .expect("Failed to load embedded font")
     };
 
     fonts::FontFamily {
@@ -37,7 +41,6 @@ fn embedded_font_family() -> fonts::FontFamily<fonts::FontData> {
     }
 }
 
-
 /// Main entry for timeline
 pub fn run_timeline(args: TimelineArgs) {
     let fur_dir = Path::new(".fur");
@@ -47,6 +50,7 @@ pub fn run_timeline(args: TimelineArgs) {
         return;
     }
 
+    // Load thread metadata
     let index: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
     let thread_id = index["active_thread"].as_str().unwrap_or("");
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
@@ -54,28 +58,33 @@ pub fn run_timeline(args: TimelineArgs) {
 
     let thread_title = thread_json["title"].as_str().unwrap_or("Untitled");
 
+    // Load avatars
     let avatars: Value = serde_json::from_str(
-        &fs::read_to_string(fur_dir.join("avatars.json")).unwrap_or_else(|_| "{}".to_string())
+        &fs::read_to_string(fur_dir.join("avatars.json"))
+            .unwrap_or_else(|_| "{}".to_string())
     ).unwrap_or(json!({}));
 
+    // Root messages (ids only)
     let empty_vec: Vec<Value> = Vec::new();
     let root_msgs = thread_json["messages"].as_array().unwrap_or(&empty_vec);
 
+    // --- PDF mode
     if let Some(path) = &args.out {
         if path.ends_with(".pdf") {
-            // ✅ PDF MODE with embedded fonts
             let font_family = embedded_font_family();
             let mut doc = Document::new(font_family);
             doc.set_title(thread_title);
 
             doc.push(
-                elements::Paragraph::new(format!("# {}", thread_title))
+                elements::Paragraph::new(thread_title)
                     .aligned(genpdf::Alignment::Center)
-                    .styled(style::Style::new().bold()),
+                    .styled(style::Style::new().bold().with_font_size(20)),
             );
+            doc.push(elements::Break::new(1));
 
             for mid in root_msgs {
                 if let Some(mid_str) = mid.as_str() {
+                    // delegate rendering
                     render_message_pdf(&fur_dir, mid_str, "Root".to_string(), &args, &avatars, &mut doc);
                 }
             }
@@ -85,7 +94,7 @@ pub fn run_timeline(args: TimelineArgs) {
             return;
         }
 
-        // Markdown mode
+        // --- Markdown mode
         let mut out_content = String::new();
         out_content.push_str(&format!("# {}\n\n", thread_title));
 
@@ -100,157 +109,11 @@ pub fn run_timeline(args: TimelineArgs) {
         return;
     }
 
-    // Terminal mode
+    // --- Terminal mode
     println!("Thread: {}", thread_title);
     for mid in root_msgs {
         if let Some(mid_str) = mid.as_str() {
             render_message(&fur_dir, mid_str, "Root".to_string(), &args, &avatars);
-        }
-    }
-}
-
-/// Terminal renderer
-fn render_message(fur_dir: &Path, msg_id: &str, label: String, args: &TimelineArgs, avatars: &Value) {
-    let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
-    let Ok(msg_content) = fs::read_to_string(&msg_path) else { return };
-    let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) else { return };
-
-    // Timestamp → local
-    let raw_time = msg_json["timestamp"].as_str().unwrap_or("???");
-    let (date_str, time_str) = if let Ok(dt) = raw_time.parse::<DateTime<FixedOffset>>() {
-        let local_dt = dt.with_timezone(&Local);
-        (local_dt.format("%Y-%m-%d").to_string(), local_dt.format("%H:%M:%S").to_string())
-    } else {
-        (raw_time.to_string(), "".to_string())
-    };
-
-    let avatar_key = msg_json["avatar"].as_str().unwrap_or("???");
-    let (name, emoji) = resolve_avatar(avatars, avatar_key);
-    let text = msg_json["text"].as_str().unwrap_or("<no content>");
-
-    println!(
-        "{} {} - {} [{}] {}:",
-        date_str.cyan(),
-        time_str.bright_cyan().bold(),
-        label.green(),
-        emoji,
-        name.yellow(),
-    );
-    println!("{}\n", text.white());
-
-    if args.verbose || args.contents {
-        if let Some(path_str) = msg_json["markdown"].as_str() {
-            if let Ok(contents) = fs::read_to_string(path_str) {
-                println!("{}", contents);
-            }
-        }
-    }
-
-    if let Some(children) = msg_json["children"].as_array() {
-        for c in children {
-            if let Some(cid) = c.as_str() {
-                render_message(fur_dir, cid, label.clone(), args, avatars);
-            }
-        }
-    }
-}
-
-/// Markdown renderer
-fn render_message_md(
-    fur_dir: &Path,
-    msg_id: &str,
-    label: String,
-    args: &TimelineArgs,
-    avatars: &Value,
-    out: &mut String,
-) {
-    let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
-    let Ok(msg_content) = fs::read_to_string(&msg_path) else { return };
-    let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) else { return };
-
-    let raw_time = msg_json["timestamp"].as_str().unwrap_or("???");
-    let (date_str, time_str) = if let Ok(dt) = raw_time.parse::<DateTime<FixedOffset>>() {
-        let local_dt = dt.with_timezone(&Local);
-        (local_dt.format("%Y-%m-%d").to_string(), local_dt.format("%H:%M:%S").to_string())
-    } else {
-        (raw_time.to_string(), "".to_string())
-    };
-
-    let avatar_key = msg_json["avatar"].as_str().unwrap_or("???");
-    let (name, _emoji) = resolve_avatar(avatars, avatar_key);
-    let text = msg_json["text"].as_str().unwrap_or("<no content>");
-
-    out.push_str(&format!("**{}:** {}\n", name, text));
-    out.push_str(&format!("_{} {} - {}_\n\n", date_str, time_str, label));
-
-    if args.verbose || args.contents {
-        if let Some(path_str) = msg_json["markdown"].as_str() {
-            if let Ok(contents) = fs::read_to_string(path_str) {
-                out.push_str(&format!("\n{}\n", contents));
-            }
-        }
-    }
-
-    if let Some(children) = msg_json["children"].as_array() {
-        for c in children {
-            if let Some(cid) = c.as_str() {
-                render_message_md(fur_dir, cid, label.clone(), args, avatars, out);
-            }
-        }
-    }
-}
-
-/// PDF renderer
-fn render_message_pdf(
-    fur_dir: &Path,
-    msg_id: &str,
-    label: String,
-    args: &TimelineArgs,
-    avatars: &Value,
-    doc: &mut Document,
-) {
-    let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
-    let Ok(msg_content) = fs::read_to_string(&msg_path) else { return };
-    let Ok(msg_json) = serde_json::from_str::<Value>(&msg_content) else { return };
-
-    let raw_time = msg_json["timestamp"].as_str().unwrap_or("???");
-    let (date_str, time_str) = if let Ok(dt) = raw_time.parse::<DateTime<FixedOffset>>() {
-        let local_dt = dt.with_timezone(&Local);
-        (local_dt.format("%Y-%m-%d").to_string(), local_dt.format("%H:%M:%S").to_string())
-    } else {
-        (raw_time.to_string(), "".to_string())
-    };
-
-    let avatar_key = msg_json["avatar"].as_str().unwrap_or("???");
-    let (name, _emoji) = resolve_avatar(avatars, avatar_key);
-    let text = msg_json["text"].as_str().unwrap_or("<no content>");
-
-    doc.push(
-        elements::Paragraph::new(format!("{}: {}", name, text))
-            .styled(style::Style::new().bold()),
-    );
-    doc.push(
-        elements::Paragraph::new(format!("{} {} - {}", date_str, time_str, label))
-            .styled(
-                style::Style::new()
-                    .italic()
-                    .with_color(style::Color::Rgb(150, 150, 150)),
-            ),
-    );
-
-    if args.verbose || args.contents {
-        if let Some(path_str) = msg_json["markdown"].as_str() {
-            if let Ok(contents) = fs::read_to_string(path_str) {
-                doc.push(elements::Paragraph::new(contents));
-            }
-        }
-    }
-
-    if let Some(children) = msg_json["children"].as_array() {
-        for c in children {
-            if let Some(cid) = c.as_str() {
-                render_message_pdf(fur_dir, cid, label.clone(), args, avatars, doc);
-            }
         }
     }
 }
