@@ -6,7 +6,7 @@
 <h1 align="center">FUR</h1>
 <p align="center">
   <strong>Forkable, Unearthable, Recursive memory tracker</strong><br/>
-A memory tracker for your conversations, ideas, and AI chats.
+Like git, but for conversations, ideas, and AI chats.
 </p>
 
 
@@ -15,81 +15,108 @@ A memory tracker for your conversations, ideas, and AI chats.
 
 ## 🤔 What is FUR?
 
-FUR is a tiny command-line tool that helps you **save and organize your chat messages** — especially your conversations with ChatGPT and other AIs — in a way that makes sense when things get complex.
+Scrolling through endless chats to find that one reply is painful.
+FUR makes it easy to **track, branch, and preserve** your conversations as trees you can navigate, fork, and export.
 
-Unlike note-taking apps, FUR lets your conversations **branch** into trees. You can:
+With FUR you can:
 
-- **Jot** text or link Markdown files as messages.  
-- **Fork** conversations into multiple possible futures.  
-- **Jump** backward or forward across messages.  
-- **See** threads as a timeline or tree.  
-- **Switch** between multiple threads.  
-- **Assign avatars** (🦊 main, 👹 others) to track who said what.  
+* **Jot** quick notes or attach Markdown files.
+* **Branch & fork** conversations into multiple futures.
+* **Jump** backward or forward to any message.
+* **See** threads as timelines or trees.
+* **Switch** between multiple threads easily.
+* **Assign avatars** (🦊 you, 🤖 bots, 👤 others — customizable).
+* **Script conversations with `.frs` files**.
+* **Export** threads to Markdown or PDF.
 
-It's a **version control system for your thoughts** — like `git`, but for conversations.
-
-> 🧠 _Think of FUR as “save points” for your mind. Every fork, every idea path, preserved forever._
-
----
-
-## 🌟 Why would I want this?
-
-- ✍️ **Writers**: Explore branching plotlines.  
-- 🧑‍💻 **Developers**: Track coding convos with AI.  
-- 🧠 **Students**: Study with side questions.  
-- 📚 **Researchers**: Organize responses and notes.  
-- 🤯 **Overthinkers**: Save *every possible what-if*.  
+Think of it as a **version control system for your thoughts**.
 
 ---
 
-## 🛠 How does it work?
+## 🌟 What’s New in v0.3.0
 
-All data lives in a `.fur/` folder:  
+**Highlights**
 
-- `.fur/index.json` → global state  
-- `.fur/threads/*.json` → one per thread  
-- `.fur/messages/*.json` → individual messages  
-- `.fur/avatars.json` → avatar mappings  
+* **`.frs` scripting** → Write branching chats declaratively and load them into FUR.
+* **Import / export** → Save any thread back into `.frs` or load existing ones.
+* **Rich exports** → Export timelines to Markdown or PDF, with branches preserved.
+* **FurScript syntax highlighting** → Official [VS Code extension](https://marketplace.visualstudio.com/items?itemName=andrewgarcia.fur-frs) for `.frs` files.
+
+---
+
+## 🛠 How it works
+
+FUR keeps everything inside a local `.fur/` folder:
+
+* `.fur/index.json` → global state
+* `.fur/threads/*.json` → one per thread
+* `.fur/messages/*.json` → one per message
+* `.fur/avatars.json` → avatar mappings
 
 ### Example commands
 
 ```bash
-# Start a new thread
+# Start fresh
 fur new "Penguin talks"
 
 # Add messages
 fur jot --text "Penguins are weird birds."
-fur jot jeff --text "Yo"        # from another avatar
+fur jot botgpt --text "Yo"      # auto-detects 🤖 for AI names
 
 # Manage avatars
-fur avatar andrew                         # sets 🦊 main avatar
-fur avatar --other ai --emoji 👹          # adds another avatar
-fur avatar --view                         # list all avatars
+fur avatar andrew               # set yourself (🦊 main)
+fur avatar tengu --emoji 👺     # create a custom avatar with emoji
+fur avatar --view
 
-# Manage threads
-fur thread --view                         # list threads
-fur thread d1f032d3                       # switch active thread
+# Work with scripts
+fur load examples/quantum_playground.frs
+fur save --out meeting_notes.frs
 
-# Navigate inside a thread
-fur tree                                  # tree view
-fur timeline --verbose                    # linear view
-fur jump --past 1                         # go back
-fur status                                # current state
+# Export views
+fur timeline --contents --out convo.md
+fur timeline --contents --out convo.pdf
 ```
+
+---
+
+## 📂 Examples
+
+The repo ships with an `examples/` directory full of ready-to-run `.frs` scripts and linked Markdown files.
+These make it easy to try FUR without writing anything from scratch.
+
+```bash
+# Quantum demo with multiple AI avatars + branching
+fur load examples/quantum_playground.frs
+fur timeline --contents
+
+# Outer-wordly penguin encounter
+fur load examples/penguin_verses.frs
+fur tree
+
+# Practical meeting notes - with attached report
+fur load examples/department_meeting.frs
+fur timeline --out meeting.pdf
+```
+
+Contents include:
+
+* **Quantum Playground** → cinematic physics, math, and startup pitch branches
+* **Penguin Verses** → recursive alien penguin gospel, with linked docs like *Meeponomicon*
+* **Department Meeting** → structured business chat w/ attached summary report
+* **Dad Jokes** → humor tree with branching punchlines
+* Plus extra flavor texts in `examples/chats/` (manifestos, equations, poems, absurdities)
 
 ---
 
 ## 🚀 Installation
 
-You'll need [Rust](https://www.rust-lang.org/tools/install).
+### From crates.io
 
 ```bash
-cargo install --path .
+cargo install fur-cli
 ```
 
-Then ensure `~/.cargo/bin` is in your `PATH`.
-
-Upgrade after edits:
+### From source
 
 ```bash
 cargo install --path . --force
@@ -99,26 +126,48 @@ cargo install --path . --force
 
 ## 🐾 Philosophy
 
-FUR is **minimal**. It's not an AI client. It's a **memory tracker** that respects:
+FUR is **minimal**.
+It's not an AI client. It's a **memory tracker** that respects:
 
 * Your brain's tendency to branch.
 * Your need to retrace steps.
 * Your desire to keep *everything*.
 
-Goal: Make recursive thinking natural.
+Avatars keep things clear: 🦊 (you), 🤖 (AI/bots), 👤 (others). But you can always customize them (`fur avatar tengu --emoji 👺`).
+
+**Goal:** Make recursive thinking natural.
 
 ---
 
-## 🛣 Roadmap (v0.2 → v1.0)
+## 🛣 Roadmap to v1.0
 
-* ✅ Threads (`fur new`, `fur thread --view`, `fur thread <id>`)
-* ✅ Avatars (`fur avatar`, `fur avatar --view`)
-* ✅ Jotting text & files (`fur jot`)
-* ✅ Tree / Timeline views
-* ✅ Jumping & forking
-* ⏳ Thread export / import
-* ⏳ DSL for batch imports
-* ⏳ Rich markdown rendering
+✅ **Already complete (v0.3)**
+
+* Threads (`fur new`, `fur thread`)
+* Avatars (`fur avatar`)
+* Jotting text & files (`fur jot`)
+* Tree / Timeline views
+* Jumping & forking
+* `.frs` scripting system (branching supported here)
+* VS Code highlighting for `.frs`
+* Thread import / export
+* Markdown & PDF rendering
+* Polished exports (Markdown/PDF with styles, embedded assets)
+
+🔜 **Planned for future releases**
+
+* `fur rm` → delete messages directly in the CLI
+* `fur move` → replace / reorder messages in a thread
+* `fur branch` → create branches interactively in the CLI (currently only in `.frs` scripts)
+* Interactive editing flows for power users
+* Richer exports (metadata, tags, avatars)
+
+🎉 **v1.0 Milestone**
+
+* Full editing suite: add, delete, move, replace, fork, branch — all stable
+* Rock-solid `.frs` import/export parity (round-trip safe)
+* Robust test coverage & docs
+* Consider cross-platform packaging (Homebrew, Scoop, etc.)
 
 ---
 
