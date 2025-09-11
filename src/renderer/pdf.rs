@@ -57,7 +57,7 @@ fn strip_emojis(input: &str) -> String {
 pub fn render_message_tex(
     fur_dir: &Path,
     msg_id: &str,
-    label: String,        // e.g. "Root", "Branch 1"
+    label: String,        // e.g. "Root", "Root - Branch 1"
     args: &TimelineArgs,
     avatars: &Value,
     tex_out: &mut File,
@@ -117,12 +117,16 @@ pub fn render_message_tex(
     )
     .unwrap();
 
-    // Recurse with explicit branch numbering
-    for (i, cid) in msg.children.iter().enumerate() {
-        let child_label = format!("Branch {}.{}", depth, i + 1);
-        render_message_tex(fur_dir, cid, child_label, args, avatars, tex_out, depth + 1);
+    // ✅ Recurse branch-aware
+    for (bi, block) in msg.branches.iter().enumerate() {
+        let branch_label = format!("{} - Branch {}", label, bi + 1);
+
+        for cid in block {
+            render_message_tex(fur_dir, cid, branch_label.clone(), args, avatars, tex_out, depth + 1);
+        }
     }
 }
+
 
 /// Export a full thread to LaTeX and compile to PDF
 pub fn export_to_pdf(

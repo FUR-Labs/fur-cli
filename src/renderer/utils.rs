@@ -6,6 +6,7 @@ use chrono::{DateTime, FixedOffset, Local};
 use crate::frs::avatars::resolve_avatar;
 
 /// Struct holding normalized message info
+#[allow(dead_code)]
 pub struct MessageInfo {
     pub date_str: String,
     pub time_str: String,
@@ -13,8 +14,11 @@ pub struct MessageInfo {
     pub emoji: String,
     pub text: String,
     pub markdown: Option<String>,
+    #[allow(dead_code)]
     pub children: Vec<String>,
+    pub branches: Vec<Vec<String>>,
 }
+
 
 /// Load and normalize a message JSON
 pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<MessageInfo> {
@@ -45,6 +49,22 @@ pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<Mes
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
         .unwrap_or_else(Vec::new);
 
+    // Branches
+    let branches = msg_json["branches"]
+        .as_array()
+        .map(|outer| {
+            outer.iter()
+                .filter_map(|block| {
+                    block.as_array().map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(Vec::new);
+
     Some(MessageInfo {
         date_str,
         time_str,
@@ -53,5 +73,6 @@ pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<Mes
         text,
         markdown,
         children,
+        branches,   // ✅ load them
     })
 }

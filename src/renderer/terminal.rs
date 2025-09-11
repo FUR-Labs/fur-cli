@@ -19,9 +19,9 @@ pub fn render_message(
         "{} {} - {} [{}] {}:",
         msg.date_str.cyan(),
         msg.time_str.bright_cyan().bold(),
-        label.green(),
+        label.bright_green(),
         msg.emoji,
-        msg.name.yellow(),
+        msg.name.bright_yellow(),
     );
     println!("{}\n", msg.text.white());
 
@@ -33,7 +33,12 @@ pub fn render_message(
         }
     }
 
-    for cid in msg.children {
-        render_message(fur_dir, &cid, label.clone(), args, avatars);
+    // ✅ Branch-aware recursion: one label per branch block
+    for (bi, block) in msg.branches.iter().enumerate() {
+        let branch_label = format!("{} - Branch {}", label, bi + 1);
+
+        for cid in block {
+            render_message(fur_dir, cid, branch_label.clone(), args, avatars);
+        }
     }
 }
