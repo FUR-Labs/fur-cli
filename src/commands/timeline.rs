@@ -2,13 +2,13 @@ use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
 use clap::Parser;
-use genpdf::{Document, elements, fonts, style, Element};
 
 use crate::renderer::{
     terminal::render_message,
     markdown::render_message_md,
-    pdf::render_message_pdf,
+    pdf::export_to_pdf,
 };
+
 
 /// Args for timeline command
 #[derive(Parser)]
@@ -26,20 +26,7 @@ pub struct TimelineArgs {
     pub out: Option<String>,
 }
 
-/// Load embedded LiberationSans font family
-fn embedded_font_family() -> fonts::FontFamily<fonts::FontData> {
-    let try_load = |bytes: &'static [u8]| {
-        fonts::FontData::new(bytes.to_vec(), None)
-            .expect("Failed to load embedded font")
-    };
 
-    fonts::FontFamily {
-        regular: try_load(include_bytes!("../../fonts/LiberationSans-Regular.ttf")),
-        bold: try_load(include_bytes!("../../fonts/LiberationSans-Bold.ttf")),
-        italic: try_load(include_bytes!("../../fonts/LiberationSans-Italic.ttf")),
-        bold_italic: try_load(include_bytes!("../../fonts/LiberationSans-BoldItalic.ttf")),
-    }
-}
 
 /// Main entry for timeline
 pub fn run_timeline(args: TimelineArgs) {
@@ -71,28 +58,10 @@ pub fn run_timeline(args: TimelineArgs) {
     // --- PDF mode
     if let Some(path) = &args.out {
         if path.ends_with(".pdf") {
-            let font_family = embedded_font_family();
-            let mut doc = Document::new(font_family);
-            doc.set_title(thread_title);
-
-            doc.push(
-                elements::Paragraph::new(thread_title)
-                    .aligned(genpdf::Alignment::Center)
-                    .styled(style::Style::new().bold().with_font_size(20)),
-            );
-            doc.push(elements::Break::new(1));
-
-            for mid in root_msgs {
-                if let Some(mid_str) = mid.as_str() {
-                    // delegate rendering
-                    render_message_pdf(&fur_dir, mid_str, "Root".to_string(), &args, &avatars, &mut doc);
-                }
-            }
-
-            doc.render_to_file(path).expect("❌ Failed writing PDF");
-            println!("✔️ Timeline exported to {}", path);
+            export_to_pdf(&fur_dir, thread_title, root_msgs, &args, &avatars, path);
             return;
         }
+
 
         // --- Markdown mode
         let mut out_content = String::new();
