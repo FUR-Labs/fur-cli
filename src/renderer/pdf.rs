@@ -83,24 +83,35 @@ pub fn render_message_tex(
     // Handle message content safely
     let base_content = if args.verbose || args.contents {
         if let Some(path_str) = msg.markdown.clone() {
+            let mut out = String::new();
+
+            // Always show text if it's non-empty
+            if !msg.text.trim().is_empty() {
+                out += &format!("{}\n\n", escape(&strip_emojis(&msg.text)));
+            }
+
+            // Try to render markdown as LaTeX
             match Command::new("pandoc")
                 .args(&["-f", "markdown", "-t", "latex", &path_str])
                 .output()
             {
                 Ok(output) if output.status.success() => {
                     let latex_body = String::from_utf8_lossy(&output.stdout);
-                    format!(
+                    out += &format!(
                         "Attached document:\n\n\\begin{{quote}}\n{}\n\\end{{quote}}\n\\clearpage",
-                        strip_emojis(&latex_body) // ⚠️ no escape here — Pandoc is already LaTeX
-                    )
+                        strip_emojis(&latex_body)
+                    );
                 }
-
                 _ => {
-                    fs::read_to_string(path_str)
+                    // Fallback to raw contents if Pandoc fails
+                    let fallback = fs::read_to_string(path_str)
                         .map(|s| escape(&strip_emojis(&s)))
-                        .unwrap_or_else(|_| escape(&strip_emojis(&msg.text)))
+                        .unwrap_or_else(|_| String::from("[Markdown file missing]"));
+                    out += &format!("{}\n\\clearpage", fallback);
                 }
             }
+
+            out
         } else {
             escape(&strip_emojis(&msg.text))
         }

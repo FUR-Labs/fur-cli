@@ -7,23 +7,29 @@ use uuid::Uuid;
 
 use crate::frs::avatars::{load_avatars, resolve_avatar};
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 pub struct JotArgs {
-    /// Optional avatar name (default = main)
+    /// Optional avatar name (defaults to 'main' if omitted)
+    #[arg(index = 1)]
     pub avatar: Option<String>,
 
-    /// Jot text
+    /// Optional jot text
+    #[arg(index = 2)]
+    pub positional_text: Option<String>,
+
+    /// Jot text (takes precedence over positional)
     #[arg(long)]
     pub text: Option<String>,
 
     /// Attach markdown file
-    #[arg(long)]
+    #[arg(long, alias = "file")]
     pub markdown: Option<String>,
 
     /// Parent message ID (optional, for replies)
     #[arg(long)]
     pub parent: Option<String>,
 }
+
 
 pub fn run_jot(args: JotArgs) {
     let fur_dir = Path::new(".fur");
@@ -34,29 +40,65 @@ pub fn run_jot(args: JotArgs) {
 
     // Load avatars
     let avatars = load_avatars();
+    let avatar_map = avatars
+        .as_object()
+        .expect("avatars.json must be a valid JSON object");
 
-    // Pick avatar name (prefer explicit, else main, else unknown)
-    let avatar_name = args.avatar.unwrap_or_else(|| {
-        avatars
-            .get("main")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string()
-    });
+    // Determine avatar + text
+    let (avatar_name, jot_text) = match (&args.avatar, &args.positional_text) {
+        (Some(a), Some(t)) => (a.clone(), Some(t.clone())),
+        (Some(a), None) => {
+            if avatar_map.contains_key(a) {
+                (a.clone(), args.text.clone())
+            } else {
+                let default_avatar = avatar_map
+                    .get("main")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                (default_avatar, Some(a.clone()))
+            }
+        }
+        (None, Some(t)) => {
+            let default_avatar = avatar_map
+                .get("main")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            (default_avatar, Some(t.clone()))
+        }
+        (None, None) => {
+            let default_avatar = avatar_map
+                .get("main")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            (default_avatar, args.text.clone())
+        }
+    };
 
-    // Create new message JSON
+    // Final text resolution (flag overrides positional)
+    let final_text = args.text.clone().or(jot_text);
+
+
+    // Optionally: prevent empty jots
+    if final_text.is_none() && args.markdown.is_none() {
+        eprintln!("🛑 You must provide either text or a markdown file.");
+        return;
+    }
+
     let message_id = Uuid::new_v4().to_string();
     let timestamp = Utc::now().to_rfc3339();
 
     let mut message = json!({
         "id": message_id,
-        "avatar": avatar_name,    // ✅ store name only
+        "avatar": avatar_name,
         "timestamp": timestamp,
         "children": [],
         "branches": [],
     });
 
-    if let Some(text) = args.text {
+    if let Some(text) = final_text {
         message["text"] = json!(text);
     }
     if let Some(md) = args.markdown {
@@ -66,13 +108,13 @@ pub fn run_jot(args: JotArgs) {
         message["parent"] = json!(parent_id);
     }
 
-    // Save message to messages/
+    // Save message
     let msg_path = fur_dir.join("messages").join(format!("{}.json", message_id));
     if let Ok(serialized) = serde_json::to_string_pretty(&message) {
         let _ = fs::write(msg_path, serialized);
     }
 
-    // Update thread index
+    // Load index
     let index_path = fur_dir.join("index.json");
     let mut index_data: Value = serde_json::from_str(
         &fs::read_to_string(&index_path).expect("Cannot read index.json"),
@@ -82,7 +124,7 @@ pub fn run_jot(args: JotArgs) {
     let thread_id = index_data["active_thread"]
         .as_str()
         .unwrap()
-        .to_string(); // ✅ clone to break borrow
+        .to_string();
 
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
     let mut thread_data: Value =
@@ -127,7 +169,6 @@ pub fn run_jot(args: JotArgs) {
 
     // Resolve emoji for display
     let (_, emoji) = resolve_avatar(&avatars, &avatar_name);
-
     println!(
         "✍️ Message jotted down to thread {}: {} [{}] {}",
         thread_id,
