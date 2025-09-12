@@ -59,14 +59,25 @@ FUR keeps everything inside a local `.fur/` folder:
 # Start fresh
 fur new "Penguin talks"
 
-# Add messages
-fur jot --text "Penguins are weird birds."
-fur jot botgpt --text "Yo"      # auto-detects 🤖 for AI names
-
 # Manage avatars
 fur avatar andrew               # set yourself (🦊 main)
 fur avatar tengu --emoji 👺     # create a custom avatar with emoji
 fur avatar --view
+
+# Jot a message as yourself (🦊)
+fur jot "Just finished reading about quantum time crystals."
+
+# Jot a message as a custom avatar (👤 or 🤖 depending on name/emoji)
+fur jot dr-strange "We’re in the endgame now."
+
+# Attach a markdown file
+fur jot ai-helper --file examples/chats/QUANTUM_MANIFESTO.md
+
+# Provide both text and file (text will show in timeline, file in exports)
+fur jot ai-helper "Here’s the updated draft." --file examples/chats/QUANTUM_MANIFESTO.md
+
+# Longform main user entry (text + equations doc)
+fur jot --text "Nonlocality still breaks my brain." --markdown examples/chats/ENTANGLEMENT_EQS.md
 
 # Work with scripts
 fur load examples/quantum_playground.frs
