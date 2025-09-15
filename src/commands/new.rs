@@ -1,9 +1,12 @@
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::Path;
 use uuid::Uuid;
 use chrono::Utc;
 use serde_json::json;
+use colored::*;
+
+use crate::frs::avatars::{load_avatars, save_avatars, get_random_emoji_for_name};
 
 /// Creates a new thread with a user-provided name.
 pub fn run_new(name: String) {
@@ -25,10 +28,72 @@ pub fn run_new(name: String) {
         let mut file = File::create(index_path).expect("Failed to write .fur/index.json");
         file.write_all(initial_index.to_string().as_bytes()).unwrap();
 
-        println!("🧱 Initialized .fur/ directory");
+        println!("{}", "[INIT] .fur/ directory created".bright_green().bold());
+
+        // === Interactive onboarding for avatars ===
+
+        // Prompt for main avatar
+        println!("\n{}", "== Main Avatar ==".bright_magenta().bold());
+        println!(
+            "{}",
+            "This is YOU (or your team). The default voice in this thread.\n\
+             Whenever you jot without specifying an avatar, it will be attributed here."
+                .bright_cyan()
+        );
+        print!("{}", "Main avatar name [main]: ");
+        io::stdout().flush().unwrap();
+        let mut main_in = String::new();
+        io::stdin().read_line(&mut main_in).unwrap();
+        let main_in = main_in.trim();
+        let main_name = if main_in.is_empty() { "main" } else { main_in };
+
+        println!(
+            "{}",
+            format!("[OK] Main avatar set: {}", main_name).bright_green().bold()
+        );
+
+        // Prompt for secondary avatar
+        println!("\n{}", "== Secondary Avatar ==".bright_magenta().bold());
+        println!(
+            "{}",
+            "You can't have a conversation with one person.\n\
+             Let's log at least one other avatar. This could be an AI, your boss, your therapist, or karen_from_hr."
+                .bright_cyan()
+        );
+        print!("{}", "Another avatar [ai]: ");
+        io::stdout().flush().unwrap();
+        let mut other_in = String::new();
+        io::stdin().read_line(&mut other_in).unwrap();
+        let other_in = other_in.trim();
+        let other_name = if other_in.is_empty() { "ai" } else { other_in };
+
+        println!(
+            "{}",
+            format!("[OK] Other avatar set: {}", other_name)
+                .bright_green().bold()
+        );
+
+        // Load current avatars (probably empty at this point)
+        let mut avatars = load_avatars();
+
+        // Set main avatar pointer + emoji
+        avatars["main"] = json!(main_name);
+        avatars[main_name] = json!("🦊");
+
+        // Set secondary avatar + auto emoji
+        let e = get_random_emoji_for_name(other_name);
+        avatars[other_name] = json!(e);
+
+        save_avatars(&avatars);
+
+        println!(
+            "\n{}",
+            "Ready! Use: \n  fur jot <your message>\n  fur jot <other avatar> <their message>"
+                .bright_cyan()
+        );
     }
 
-    // Create new thread
+    // === Create new thread ===
     let thread_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
@@ -37,7 +102,7 @@ pub fn run_new(name: String) {
         "created_at": now,
         "messages": [],
         "tags": [],
-        "title": name,  // 👈 custom name instead of auto title
+        "title": name,
     });
 
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
@@ -63,5 +128,10 @@ pub fn run_new(name: String) {
         .write_all(index_data.to_string().as_bytes())
         .unwrap();
 
-    println!("🌱 New thread created: {} — \"{}\"", &thread_id[..8], name);
+    println!(
+        "{}",
+        format!("[NEW] Thread created: {} — \"{}\"", &thread_id[..8], name)
+            .bright_green()
+            .bold()
+    );
 }
