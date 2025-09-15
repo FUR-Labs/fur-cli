@@ -37,15 +37,25 @@ pub fn run_new(name: String) {
         println!(
             "{}",
             "This is YOU (or your team). The default voice in this thread.\n\
-             Whenever you jot without specifying an avatar, it will be attributed here."
+            Whenever you jot without specifying an avatar, it will be attributed here."
                 .bright_cyan()
         );
-        print!("{}", "Main avatar name [main]: ");
+        print!("{}", "Main avatar name [me]: ");
         io::stdout().flush().unwrap();
         let mut main_in = String::new();
         io::stdin().read_line(&mut main_in).unwrap();
         let main_in = main_in.trim();
-        let main_name = if main_in.is_empty() { "main" } else { main_in };
+
+        let mut main_name = if main_in.is_empty() { "me" } else { main_in };
+        if main_name == "main" {
+            println!(
+                "{}",
+                "[WARN] 'main' is reserved as a pointer. Using 'me' instead."
+                    .yellow()
+                    .bold()
+            );
+            main_name = "me";
+        }
 
         println!(
             "{}",
