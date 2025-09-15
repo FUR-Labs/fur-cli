@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::commands::timeline::TimelineArgs;
 use crate::renderer::utils::load_message;
 
-/// LaTeX preamble with fixes for Pandoc output + math
+/// LaTeX preamble with fixes for Pandoc output + math + images
 fn latex_preamble(thread_title: &str) -> String {
     format!(
 r#"\documentclass[12pt]{{article}}
@@ -20,6 +20,7 @@ r#"\documentclass[12pt]{{article}}
 \usepackage[T1]{{fontenc}}
 \usepackage[utf8]{{inputenc}}
 \usepackage{{lmodern}}
+\usepackage{{graphicx}}
 
 % Pandoc fix for lists
 \providecommand{{\tightlist}}{{%
@@ -119,7 +120,23 @@ pub fn render_message_tex(
         escape(&strip_emojis(&msg.text))
     };
 
-    // Instead of indentation, show branch label explicitly
+    let mut full_content = base_content.clone();
+
+    if let Some(att) = msg.attachment.clone() {
+        if att.ends_with(".png")
+            || att.ends_with(".jpg")
+            || att.ends_with(".jpeg")
+            || att.ends_with(".pdf")     // ✅ allow PDFs
+        {
+            full_content += &format!(
+                "\n\\begin{{center}}\\includegraphics[width=0.9\\linewidth]{{{}}}\\end{{center}}\n",
+                att
+            );
+        } else {
+            full_content += &format!("\n[Attachment: {}]\n", att);
+        }
+    }
+
     writeln!(
         tex_out,
         "\\MessageBlock{{{}}}{{{} {} - {}}}{{{}}}",
@@ -127,9 +144,10 @@ pub fn render_message_tex(
         msg.date_str,
         msg.time_str,
         label,
-        base_content
+        full_content
     )
     .unwrap();
+
 
     // ✅ Recurse branch-aware
     for (bi, block) in msg.branches.iter().enumerate() {

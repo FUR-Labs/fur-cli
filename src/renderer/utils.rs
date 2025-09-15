@@ -14,10 +14,12 @@ pub struct MessageInfo {
     pub emoji: String,
     pub text: String,
     pub markdown: Option<String>,
+    pub attachment: Option<String>, 
     #[allow(dead_code)]
     pub children: Vec<String>,
     pub branches: Vec<Vec<String>>,
 }
+
 
 
 /// Load and normalize a message JSON
@@ -65,6 +67,8 @@ pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<Mes
         })
         .unwrap_or_else(Vec::new);
 
+    let attachment = msg_json["attachment"].as_str().map(|s| s.to_string());
+
     Some(MessageInfo {
         date_str,
         time_str,
@@ -72,7 +76,8 @@ pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<Mes
         emoji,
         text,
         markdown,
+        attachment,
         children,
-        branches,   // ✅ load them
+        branches,
     })
 }

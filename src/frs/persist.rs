@@ -170,6 +170,7 @@ fn persist_level(msgs: &[Message], parent: Option<String>) -> Vec<String> {
             "name": m.avatar,
             "text": m.text,
             "markdown": m.file,
+            "attachment": m.attachment,
             "parent": parent,
             "children": direct_children_ids,
             "branches": branch_groups_ids,

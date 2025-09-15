@@ -14,6 +14,10 @@ pub fn render_message(
     avatars: &Value,
 ) {
     let Some(msg) = load_message(fur_dir, msg_id, avatars) else { return };
+    
+    if let Some(att) = msg.attachment {
+        println!("{}🖼️ [Attachment: {}]\n", " ".repeat(4), att);
+    }
 
     println!(
         "{} {} - {} [{}] {}:",

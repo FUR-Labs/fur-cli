@@ -270,6 +270,7 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
                 avatar: default_avatar.to_string(),
                 text: None,
                 file: Some(path),
+                attachment: None, 
                 children: vec![],
                 branches: vec![],
             });
@@ -280,6 +281,7 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
                     avatar: default_avatar.to_string(),
                     text: Some(text),
                     file: None,
+                    attachment: None, 
                     children: vec![],
                     branches: vec![],
                 });
@@ -300,19 +302,21 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
             avatar,
             text: None,
             file: Some(path),
+            attachment: None, 
             children: vec![],
             branches: vec![],
         });
     }
 
     if let Some(text) = collect_multiline_quoted(lines, i) {
-        Some(Message {
+        return Some(Message {
             avatar,
             text: Some(text),
             file: None,
+            attachment: None, 
             children: vec![],
             branches: vec![],
-        })
+        });
     } else {
         None
     }

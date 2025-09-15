@@ -11,7 +11,8 @@ pub struct Thread {
 pub struct Message {
     pub avatar: String,
     pub text: Option<String>,
-    pub file: Option<String>,
+    pub file: Option<String>,          // markdown only
+    pub attachment: Option<String>,    // new: image or other binary
     pub children: Vec<Message>,
     pub branches: Vec<Vec<Message>>,
 }

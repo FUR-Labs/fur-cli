@@ -89,6 +89,8 @@ fn render_message(msg_id: &str, indent: usize, fur_dir: &Path) -> String {
         out.push_str(&format!("{}jot {} \"{}\"\n", pad, avatar, text));
     } else if let Some(file) = msg["markdown"].as_str() {
         out.push_str(&format!("{}jot {} --file \"{}\"\n", pad, avatar, file));
+    } else if let Some(att) = msg["attachment"].as_str() {
+        out.push_str(&format!("{}jot {} --img \"{}\"\n", pad, avatar, att));
     }
 
     if let Some(branches) = msg["branches"].as_array() {

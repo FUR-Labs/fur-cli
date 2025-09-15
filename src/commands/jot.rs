@@ -25,6 +25,10 @@ pub struct JotArgs {
     #[arg(long, alias = "file")]
     pub markdown: Option<String>,
 
+    /// Attach image (PNG, JPG, etc.)
+    #[arg(long)]
+    pub img: Option<String>,
+
     /// Parent message ID (optional, for replies)
     #[arg(long)]
     pub parent: Option<String>,
@@ -103,6 +107,9 @@ pub fn run_jot(args: JotArgs) {
     }
     if let Some(md) = args.markdown {
         message["markdown"] = json!(md);
+    }
+    if let Some(img) = args.img {
+        message["attachment"] = json!(img);
     }
     if let Some(ref parent_id) = args.parent {
         message["parent"] = json!(parent_id);
