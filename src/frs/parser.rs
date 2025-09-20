@@ -147,11 +147,17 @@ fn parse_block(
 
         if line.starts_with("jot") {
             if let Some(msg) = parse_jot_line(lines, i, default_user) {
-                msgs.push(msg);
+                msgs.push(ScriptItem::Message(msg));
             }
-            continue; // note: parse_jot_line already advanced `i`
+            continue;
         }
 
+        if is_command_line(line) {
+            let cmd = parse_command_line(line, *i + 1); // +1 because human line numbers
+            msgs.push(ScriptItem::Command(cmd));
+            *i += 1;
+            continue;
+        }
 
         if is_branch_open(line) {
             *i += 1; // consume "branch {"
@@ -327,4 +333,18 @@ fn extract_quoted(line: &str) -> Option<String> {
     let start = line.find('"')?;
     let end = line[start + 1..].find('"')? + start + 1;
     Some(line[start + 1..end].to_string())
+}
+
+fn is_command_line(line: &str) -> bool {
+    line.starts_with("timeline")
+        || line.starts_with("tree")
+        || line.starts_with("status")
+        || line.starts_with("store")
+}
+
+fn parse_command_line(line: &str, line_number: usize) -> Command {
+    let mut parts = line.split_whitespace();
+    let name = parts.next().unwrap_or("").to_string();
+    let args = parts.map(|s| s.to_string()).collect();
+    Command { name, args, line_number }
 }

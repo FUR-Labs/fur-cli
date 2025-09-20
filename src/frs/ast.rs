@@ -17,8 +17,23 @@ pub struct Message {
     pub branches: Vec<Vec<Message>>,
 }
 
-impl Thread {
-    pub fn new(title: String) -> Self {
-        Thread { title, tags: vec![], messages: vec![] }
-    }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Thread {
+    pub title: String,
+    pub tags: Vec<String>,
+    pub items: Vec<ScriptItem>,   // not only messages
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ScriptItem {
+    Message(Message),      // jot or branch
+    Command(Command),      // timeline, tree, store...
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Command {
+    pub name: String,             // "timeline"
+    pub args: Vec<String>,        // ["--out", "TIMELINE_1.md", "--since", "35"]
+    pub line_number: usize,       // useful for --since N referencing
+}
+

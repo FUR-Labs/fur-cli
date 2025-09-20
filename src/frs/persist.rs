@@ -67,7 +67,13 @@ pub fn persist_frs(thread: &Thread) -> String {
     let timestamp = Utc::now().to_rfc3339();
 
     // Persist only the *root* jots; recursion handles nested branches
-    let root_ids = persist_level(&thread.messages, None);
+    let root_ids = persist_level(
+        &thread.items.iter().filter_map(|item| {
+            if let ScriptItem::Message(m) = item { Some(m) } else { None }
+        }).cloned().collect::<Vec<_>>(),
+        None
+    );
+
 
     let thread_json = json!({
         "id": thread_id,

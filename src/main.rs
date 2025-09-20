@@ -16,6 +16,7 @@ use crate::commands::{
     save::{self, SaveArgs},
     new,
     thread,
+    run,
 };
 
 #[derive(Parser)]
@@ -68,7 +69,6 @@ enum Commands {
     /// Manage threads (list or switch)
     Thread(thread::ThreadArgs),
 
-
     /// Fork the current message into a new thread
     Fork {
         /// ID of the message to fork from (optional)
@@ -84,19 +84,16 @@ enum Commands {
     Jump(JumpArgs),
 
     /// Add a new message or link a markdown file
-    ///
-    /// Use `--file` to attach a markdown document.
     Jot(JotArgs),
 
     /// Show the thread as a linear timeline
-    Timeline(TimelineArgs),  // Pass verbose flag here
+    Timeline(TimelineArgs),
 
     /// Show the thread as a branching tree
     Tree(TreeArgs),
 
-    /// Import a .frs file
-    Load {
-        #[arg(help = "Path to the .frs file")]
+    /// Run an .frs script (import + execute)
+    Run {
         path: String,
     },
 
@@ -105,6 +102,14 @@ enum Commands {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+
+    // === Shortcut: fur script.frs
+    if args.len() == 2 && args[1].ends_with(".frs") {
+        run::run_frs(&args[1]);
+        return;
+    }
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -126,9 +131,7 @@ fn main() {
 
         Commands::Status {} => status::run_status(),
 
-        Commands::Thread(args) => {
-            thread::run_thread(args);
-        }
+        Commands::Thread(args) => thread::run_thread(args),
 
         Commands::Fork { id, title } => {
             if id.is_empty() {
@@ -146,14 +149,12 @@ fn main() {
 
         Commands::Jot(args) => jot::run_jot(args),
 
-        Commands::Timeline(args) => timeline::run_timeline(args),  // Pass args here
+        Commands::Timeline(args) => timeline::run_timeline(args),
 
         Commands::Tree(args) => tree::run_tree(args),
 
-        Commands::Load { path } => {
-            let thread = frs::import_frs(&path);
-            let thread_id = frs::persist_frs(&thread);
-            println!("✔️ Saved as thread {}", &thread_id[..8]);
+        Commands::Run { path } => {
+            run::run_frs(&path);
         }
 
         Commands::Save(args) => save::run_save(args),
