@@ -23,3 +23,11 @@ uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 rand = "0.9.2"
 colored = "3.0.0"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lib]
+name = "fur_cli"
+path = "src/lib.rs"
+
