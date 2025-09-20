@@ -124,9 +124,10 @@ pub fn import_frs(path: &str) -> Thread {
         }
     }
 
+
     // enforce main avatar
-    if let Some(main) = avatars.get("main").and_then(|v| v.as_str()) {
-        save_avatars_with_main(&mut avatars, &main.to_string());
+    if let Some(main) = avatars.get("main").and_then(|v| v.as_str()).map(|s| s.to_string()) {
+    save_avatars_with_main(&mut avatars, &main);
     } else if let Some(first) = to_register.first() {
         save_avatars_with_main(&mut avatars, first);
     } else {
@@ -268,6 +269,43 @@ fn parse_tags_line(line: &str) -> Option<Vec<String>> {
     Some(tags)
 }
 
+fn make_message(
+    avatar: &str,
+    text: Option<String>,
+    file: Option<String>,
+    attachment: Option<String>,
+) -> Message {
+    Message {
+        avatar: avatar.to_string(),
+        text,
+        file,
+        attachment,
+        children: vec![],
+        branches: vec![],
+    }
+}
+
+fn parse_text_jot(lines: &[String], i: &mut usize, avatar: &str) -> Option<Message> {
+    collect_multiline_quoted(lines, i)
+        .map(|text| make_message(avatar, Some(text), None, None))
+}
+
+fn parse_file_jot(line: &str, i: &mut usize, avatar: &str) -> Option<Message> {
+    let path = extract_quoted(line)
+        .or_else(|| line.split_whitespace().last().map(|s| s.to_string()))
+        .unwrap_or_default();
+    *i += 1;
+    Some(make_message(avatar, None, Some(path), None))
+}
+
+fn parse_attach_jot(line: &str, i: &mut usize, avatar: &str) -> Option<Message> {
+    let path = extract_quoted(line)
+        .or_else(|| line.split_whitespace().last().map(|s| s.to_string()))
+        .unwrap_or_default();
+    *i += 1;
+    Some(make_message(avatar, None, None, Some(path)))
+}
+
 fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Option<Message> {
     let line = &lines[*i];
     let mut parts = line.split_whitespace();
@@ -278,67 +316,26 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
 
     let second = parts.next().unwrap_or("");
 
-    // Case A: `jot "text..."`  OR  `jot --file path`
-    if second == "--file" || second.starts_with('"') {
-        if second == "--file" {
-            let path = extract_quoted(line)
-                .or_else(|| parts.last().map(|s| s.to_string()))
-                .unwrap_or_default();
-            *i += 1;
-            return Some(Message {
-                avatar: default_avatar.to_string(),
-                text: None,
-                file: Some(path),
-                attachment: None,
-                children: vec![],
-                branches: vec![],
-            });
-        } else {
-            // multi-line text case
-            if let Some(text) = collect_multiline_quoted(lines, i) {
-                return Some(Message {
-                    avatar: default_avatar.to_string(),
-                    text: Some(text),
-                    file: None,
-                    attachment: None,
-                    children: vec![],
-                    branches: vec![],
-                });
-            } else {
-                return None;
-            }
-        }
+    // Case A: default avatar
+    if second == "--file" {
+        return parse_file_jot(line, i, default_avatar);
+    }
+    if second == "--attach" {
+        return parse_attach_jot(line, i, default_avatar);
+    }
+    if second.starts_with('"') {
+        return parse_text_jot(lines, i, default_avatar);
     }
 
-    // Case B: `jot ai ...`
+    // Case B: explicit avatar
     let avatar = second.to_string();
     if line.contains("--file") {
-        let path = extract_quoted(line)
-            .or_else(|| line.split_whitespace().last().map(|s| s.to_string()))
-            .unwrap_or_default();
-        *i += 1;
-        return Some(Message {
-            avatar,
-            text: None,
-            file: Some(path),
-            attachment: None,
-            children: vec![],
-            branches: vec![],
-        });
+        return parse_file_jot(line, i, &avatar);
     }
-
-    if let Some(text) = collect_multiline_quoted(lines, i) {
-        return Some(Message {
-            avatar,
-            text: Some(text),
-            file: None,
-            attachment: None,
-            children: vec![],
-            branches: vec![],
-        });
-    } else {
-        None
+    if line.contains("--attach") {
+        return parse_attach_jot(line, i, &avatar);
     }
+    parse_text_jot(lines, i, &avatar)
 }
 
 
