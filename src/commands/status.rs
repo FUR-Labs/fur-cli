@@ -85,12 +85,7 @@ fn load_index_and_thread(fur_dir: &Path) -> (Value, Value, String) {
         serde_json::from_str(&fs::read_to_string(&index_path).expect("❌ Cannot read index.json"))
             .unwrap();
 
-    let thread_id = if let Some(ref override_id) = args.thread_override {
-        override_id
-    } else {
-        index["active_thread"].as_str().unwrap_or("")
-    };
-
+    let thread_id = index["active_thread"].as_str().unwrap_or("");
     let current_msg_id = index["current_message"].as_str().unwrap_or("").to_string();
 
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
