@@ -1,34 +1,81 @@
-use crate::frs::{import_frs, persist_frs};
-use crate::frs::ast::{ScriptItem, Command};
-use crate::commands::{timeline, tree, status, save};
+use std::fs;
 use std::path::Path;
+use colored::*;
+use crate::frs::{parser, persist_frs};
+use crate::commands::{timeline, tree};
+use crate::commands::timeline::TimelineArgs;
+use crate::commands::tree::TreeArgs;
 
-/// Run an .frs script: import, persist, and execute commands
+/// Run an .frs script:
+/// - Parse into Thread (in-memory)
+/// - Execute inline commands (tree, timeline, etc.)
+/// - Persist once at first `store`
+/// - Ignore later `store`s
 pub fn run_frs(path: &str) {
-    if !Path::new(path).exists() {
-        eprintln!("❌ File not found: {}", path);
-        return;
+    let raw = fs::read_to_string(path)
+        .unwrap_or_else(|_| panic!("❌ Could not read .frs file: {}", path));
+
+    let lines: Vec<String> = raw
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+
+    let mut thread = parser::parse_frs(path);
+    let mut stored = false;
+
+    for (lineno, line) in lines.iter().enumerate() {
+        // Handle special commands
+        if line == "store" {
+            if !stored {
+                let tid = persist_frs(&thread);
+                println!("✔️ Thread persisted at line {} → {}", lineno + 1, &tid[..8]);
+                stored = true;
+            } else {
+                eprintln!(
+                    "{}",
+                    format!("⚠️ Ignoring extra `store` at line {} — already persisted", lineno + 1)
+                        .yellow()
+                        .bold()
+                );
+            }
+            continue;
+        }
+
+        if line.starts_with("timeline") {
+            // crude arg split, you may want to Clap-ify later
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let mut args = TimelineArgs {
+                verbose: false,
+                contents: false,
+                out: None,
+            };
+            for (i, p) in parts.iter().enumerate() {
+                if *p == "--out" {
+                    args.out = parts.get(i + 1).map(|s| s.to_string());
+                }
+                if *p == "--contents" {
+                    args.contents = true;
+                }
+            }
+            timeline::run_timeline(args);
+            continue;
+        }
+
+        if line.starts_with("tree") {
+            let args = TreeArgs {};
+            tree::run_tree(args);
+            continue;
+        }
+
+        // Default: skip, because parse_frs already consumed jots/branches
     }
 
-    // Step 1: parse script
-    let thread = import_frs(path);
-
-    // Step 2: persist messages (like `fur load`)
-    let thread_id = persist_frs(&thread);
-    println!("✔️ Imported as thread {}", &thread_id[..8]);
-
-    // Step 3: execute embedded commands
-    for item in thread.items {
-        match item {
-            ScriptItem::Message(_) => {
-                // already persisted in step 2
-            }
-            ScriptItem::Command(cmd) => {
-                dispatch_command(cmd);
-            }
-        }
+    if !stored {
+        eprintln!("{}", "⚠️ Script finished without a `store` — nothing persisted.".yellow());
     }
 }
+
 
 /// Dispatch a script-level command (timeline, tree, etc.)
 fn dispatch_command(cmd: Command) {
