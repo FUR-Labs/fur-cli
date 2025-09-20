@@ -1,8 +1,7 @@
-use serde_json::json;
 use std::fs;
 use crate::frs::ast::{Thread, Message, ScriptItem, Command};
 use crate::frs::avatars::{
-    load_avatars, save_avatars, save_avatars_with_main, collect_avatars, get_random_emoji,
+    load_avatars, 
 };
 
 /// Pure parser: read .frs into a Thread struct (no side effects)
@@ -96,44 +95,6 @@ pub fn parse_frs(path: &str) -> Thread {
 
     // ---- parse content into items
     thread.items = parse_block(&lines, &mut i, false, &default_user);
-    thread
-}
-
-/// Import .frs: parse + update avatars.json
-pub fn import_frs(path: &str) -> Thread {
-    let thread = parse_frs(path);
-
-    let mut avatars = load_avatars();
-    let mut to_register: Vec<String> = Vec::new();
-
-    for item in &thread.items {
-        if let ScriptItem::Message(m) = item {
-            collect_avatars(&[m.clone()], &mut to_register);
-        }
-    }
-
-    for name in &to_register {
-        if !avatars.as_object().unwrap().contains_key(name) {
-            let emoji = if Some(name.as_str()) == avatars.get("main").and_then(|v| v.as_str()) {
-                "🦊".to_string() // force fox
-            } else {
-                get_random_emoji()
-            };
-            avatars[name] = json!(emoji);
-            println!("✨ New avatar detected: \"{}\" → {}", name, emoji);
-        }
-    }
-
-
-    // enforce main avatar
-    if let Some(main) = avatars.get("main").and_then(|v| v.as_str()).map(|s| s.to_string()) {
-    save_avatars_with_main(&mut avatars, &main);
-    } else if let Some(first) = to_register.first() {
-        save_avatars_with_main(&mut avatars, first);
-    } else {
-        save_avatars(&avatars);
-    }
-
     thread
 }
 

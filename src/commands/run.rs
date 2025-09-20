@@ -80,7 +80,7 @@ pub fn run_frs(path: &str) {
 
         // --- Tree
         if line.starts_with("tree") {
-            let mut args = TreeArgs { thread_override: None };
+            let args = TreeArgs { thread_override: None };
             with_ephemeral(stored, &thread, |tid_override| {
                 let mut args = args.clone();
                 args.thread_override = tid_override;
