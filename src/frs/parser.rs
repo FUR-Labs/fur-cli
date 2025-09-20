@@ -1,7 +1,9 @@
 use serde_json::json;
 use std::fs;
-use crate::frs::ast::{Thread, Message};
-use crate::frs::avatars::{load_avatars, save_avatars, save_avatars_with_main, collect_avatars, get_random_emoji};
+use crate::frs::ast::{Thread, Message, ScriptItem, Command};
+use crate::frs::avatars::{
+    load_avatars, save_avatars, save_avatars_with_main, collect_avatars, get_random_emoji,
+};
 
 /// Pure parser: read .frs into a Thread struct (no side effects)
 pub fn parse_frs(path: &str) -> Thread {
@@ -27,7 +29,11 @@ pub fn parse_frs(path: &str) -> Thread {
         }
         i += 1;
     };
-    let mut thread = Thread::new(title);
+    let mut thread = Thread {
+        title,
+        tags: vec![],
+        items: vec![],
+    };
     i += 1;
 
     // ---- header meta (any order): user, tags ...
@@ -84,12 +90,12 @@ pub fn parse_frs(path: &str) -> Thread {
         if let Some(main) = avatars.get("main").and_then(|v| v.as_str()) {
             main.to_string()
         } else {
-            panic!("❌ Please define main avatar by typing `user = <name>` (or set one with `fur avatar <name>`).");
+            panic!("❌ Please define main avatar with `user = <name>` or set one with `fur avatar <name>`.");
         }
     };
 
-    // ---- top-level messages (root stem)
-    thread.messages = parse_block(&lines, &mut i, false, &default_user);
+    // ---- parse content into items
+    thread.items = parse_block(&lines, &mut i, false, &default_user);
     thread
 }
 
@@ -99,7 +105,12 @@ pub fn import_frs(path: &str) -> Thread {
 
     let mut avatars = load_avatars();
     let mut to_register: Vec<String> = Vec::new();
-    collect_avatars(&thread.messages, &mut to_register);
+
+    for item in &thread.items {
+        if let ScriptItem::Message(m) = item {
+            collect_avatars(&[m.clone()], &mut to_register);
+        }
+    }
 
     for name in &to_register {
         if !avatars.as_object().unwrap().contains_key(name) {
@@ -113,11 +124,9 @@ pub fn import_frs(path: &str) -> Thread {
         }
     }
 
-
     // enforce main avatar
     if let Some(main) = avatars.get("main").and_then(|v| v.as_str()) {
-        let main_str = main.to_string(); // break borrow
-        save_avatars_with_main(&mut avatars, &main_str);
+        save_avatars_with_main(&mut avatars, &main.to_string());
     } else if let Some(first) = to_register.first() {
         save_avatars_with_main(&mut avatars, first);
     } else {
@@ -134,8 +143,8 @@ fn parse_block(
     i: &mut usize,
     stop_at_closing_brace: bool,
     default_user: &str,
-) -> Vec<Message> {
-    let mut msgs: Vec<Message> = Vec::new();
+) -> Vec<ScriptItem> {
+    let mut items: Vec<ScriptItem> = Vec::new();
 
     while *i < lines.len() {
         let line = &lines[*i];
@@ -147,31 +156,40 @@ fn parse_block(
 
         if line.starts_with("jot") {
             if let Some(msg) = parse_jot_line(lines, i, default_user) {
-                msgs.push(ScriptItem::Message(msg));
+                items.push(ScriptItem::Message(msg));
             }
             continue;
         }
 
         if is_command_line(line) {
-            let cmd = parse_command_line(line, *i + 1); // +1 because human line numbers
-            msgs.push(ScriptItem::Command(cmd));
+            let cmd = parse_command_line(line, *i + 1);
+            items.push(ScriptItem::Command(cmd));
             *i += 1;
             continue;
         }
 
         if is_branch_open(line) {
             *i += 1; // consume "branch {"
-            if msgs.is_empty() {
+            if items.is_empty() {
                 eprintln!("❌ branch with no preceding jot at line {}", i);
                 let _ = parse_block(lines, i, true, default_user);
                 continue;
             }
-            let children_block = parse_block(lines, i, true, default_user); // one branch block
-            if let Some(last) = msgs.last_mut() {
-                // Save as a grouped branch
-                last.branches.push(children_block.clone());
+            let children_block = parse_block(lines, i, true, default_user);
+            if let Some(ScriptItem::Message(last)) = items.last_mut() {
+                let children: Vec<Message> = children_block
+                    .into_iter()
+                    .filter_map(|si| {
+                        if let ScriptItem::Message(m) = si {
+                            Some(m)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                last.branches.push(children.clone());
                 // Also flatten into children for compatibility
-                last.children.extend(children_block);
+                last.children.extend(children);
             }
             continue;
         }
@@ -190,7 +208,7 @@ fn parse_block(
         }
     }
 
-    msgs
+    items
 }
 
 fn is_branch_open(line: &str) -> bool {
@@ -250,11 +268,6 @@ fn parse_tags_line(line: &str) -> Option<Vec<String>> {
     Some(tags)
 }
 
-/// Parse a jot line: either:
-/// - `jot "text"` (uses default user)
-/// - `jot --file path` (uses default user)
-/// - `jot ai "text"`
-/// - `jot ai --file LARGE_THESIS.md` (path may be quoted or bare)
 fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Option<Message> {
     let line = &lines[*i];
     let mut parts = line.split_whitespace();
@@ -276,7 +289,7 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
                 avatar: default_avatar.to_string(),
                 text: None,
                 file: Some(path),
-                attachment: None, 
+                attachment: None,
                 children: vec![],
                 branches: vec![],
             });
@@ -287,7 +300,7 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
                     avatar: default_avatar.to_string(),
                     text: Some(text),
                     file: None,
-                    attachment: None, 
+                    attachment: None,
                     children: vec![],
                     branches: vec![],
                 });
@@ -308,7 +321,7 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
             avatar,
             text: None,
             file: Some(path),
-            attachment: None, 
+            attachment: None,
             children: vec![],
             branches: vec![],
         });
@@ -319,7 +332,7 @@ fn parse_jot_line(lines: &[String], i: &mut usize, default_avatar: &str) -> Opti
             avatar,
             text: Some(text),
             file: None,
-            attachment: None, 
+            attachment: None,
             children: vec![],
             branches: vec![],
         });
