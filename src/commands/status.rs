@@ -4,8 +4,16 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use colored::*;
 use crate::frs::avatars::resolve_avatar;
+use clap::Parser;
 
-pub fn run_status() {
+#[derive(Parser, Debug)]
+pub struct StatusArgs {
+    /// Optional thread override (used by `fur run` for ephemeral runs)
+    #[clap(skip)]
+    pub thread_override: Option<String>,
+}
+
+pub fn run_status(args: StatusArgs) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
 
@@ -20,7 +28,17 @@ pub fn run_status() {
     ).unwrap_or(json!({}));
 
     // Load index + thread
-    let (index, thread, mut current_msg_id) = load_index_and_thread(&fur_dir);
+    let (index, mut thread, mut current_msg_id) = load_index_and_thread(&fur_dir);
+
+    // --- use override if present
+    if let Some(ref tid) = args.thread_override {
+        let thread_path = fur_dir.join("tmp").join(format!("{}.json", tid));
+        if let Ok(content) = fs::read_to_string(&thread_path) {
+            if let Ok(tmp_thread) = serde_json::from_str::<Value>(&content) {
+                thread = tmp_thread;
+            }
+        }
+    }
 
     // Preload all messages
     let id_to_message = build_id_to_message(&fur_dir, &thread);
@@ -67,7 +85,12 @@ fn load_index_and_thread(fur_dir: &Path) -> (Value, Value, String) {
         serde_json::from_str(&fs::read_to_string(&index_path).expect("❌ Cannot read index.json"))
             .unwrap();
 
-    let thread_id = index["active_thread"].as_str().unwrap_or("❓");
+    let thread_id = if let Some(ref override_id) = args.thread_override {
+        override_id
+    } else {
+        index["active_thread"].as_str().unwrap_or("")
+    };
+
     let current_msg_id = index["current_message"].as_str().unwrap_or("").to_string();
 
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));

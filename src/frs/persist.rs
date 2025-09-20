@@ -101,6 +101,50 @@ pub fn persist_frs(thread: &Thread) -> String {
     thread_id
 }
 
+
+/// Ephemeral persist: writes a thread into `.fur/tmp/` for previews.
+/// Returns ephemeral thread_id.
+pub fn persist_ephemeral(thread: &Thread) -> String {
+    let fur_dir = Path::new(".fur/tmp");
+    if !fur_dir.exists() {
+        fs::create_dir_all(fur_dir).expect("❌ Could not create .fur/tmp/");
+    }
+
+    let thread_id = format!("ephemeral-{}", Uuid::new_v4().to_string());
+    let timestamp = Utc::now().to_rfc3339();
+
+    let root_ids = persist_level(
+        &thread.items.iter().filter_map(|item| {
+            if let ScriptItem::Message(m) = item { Some(m) } else { None }
+        }).cloned().collect::<Vec<_>>(),
+        None
+    );
+
+    let thread_json = json!({
+        "id": thread_id,
+        "created_at": timestamp,
+        "title": thread.title,
+        "tags": thread.tags,
+        "messages": root_ids,
+    });
+
+    let thread_path = fur_dir.join(format!("{}.json", thread_id));
+    fs::write(&thread_path, serde_json::to_string_pretty(&thread_json).unwrap())
+        .expect("❌ Could not write ephemeral thread file");
+
+    thread_id
+}
+
+/// Clean up ephemeral thread + messages
+pub fn cleanup_ephemeral(thread_id: &str) {
+    let fur_dir = Path::new(".fur/tmp");
+    let thread_path = fur_dir.join(format!("{}.json", thread_id));
+    let _ = fs::remove_file(thread_path);
+    // NOTE: if we want to also clean messages, we can follow `delete_message_recursive`.
+}
+
+
+
 /// Delete an old thread and all its message files.
 fn delete_old_thread(thread_id: &str) {
     let fur_dir = Path::new(".fur");

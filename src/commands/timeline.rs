@@ -13,17 +13,15 @@ use crate::renderer::{
 /// Args for timeline command
 #[derive(Parser)]
 pub struct TimelineArgs {
-    /// Whether to show full content of Markdown files
     #[arg(short, long)]
     pub verbose: bool,
-
-    /// Alias for --verbose
     #[arg(long)]
     pub contents: bool,
-
-    /// Write output to a file (Markdown or PDF, depending on extension)
     #[arg(long)]
     pub out: Option<String>,
+
+    #[clap(skip)]
+    pub thread_override: Option<String>,
 }
 
 
@@ -39,7 +37,12 @@ pub fn run_timeline(args: TimelineArgs) {
 
     // Load thread metadata
     let index: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
-    let thread_id = index["active_thread"].as_str().unwrap_or("");
+    let thread_id = if let Some(ref override_id) = args.thread_override {
+        override_id
+    } else {
+        index["active_thread"].as_str().unwrap_or("")
+    };
+
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
     let thread_json: Value = serde_json::from_str(&fs::read_to_string(&thread_path).unwrap()).unwrap();
 

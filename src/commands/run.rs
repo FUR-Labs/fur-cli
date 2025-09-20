@@ -42,13 +42,23 @@ pub fn run_frs(path: &str) {
             continue;
         }
 
+        if line.starts_with("status") {
+            with_ephemeral(stored, &thread, |tid_override| {
+                let args = crate::commands::status::StatusArgs {
+                    thread_override: tid_override,
+                };
+                crate::commands::status::run_status(args);
+            });
+            continue;
+        }
+
         if line.starts_with("timeline") {
-            // crude arg split, you may want to Clap-ify later
             let parts: Vec<&str> = line.split_whitespace().collect();
             let mut args = TimelineArgs {
                 verbose: false,
                 contents: false,
                 out: None,
+                thread_override: None,
             };
             for (i, p) in parts.iter().enumerate() {
                 if *p == "--out" {
@@ -58,15 +68,25 @@ pub fn run_frs(path: &str) {
                     args.contents = true;
                 }
             }
-            timeline::run_timeline(args);
+
+            with_ephemeral(stored, &thread, |tid_override| {
+                args.thread_override = tid_override;
+                timeline::run_timeline(args);
+            });
             continue;
         }
 
         if line.starts_with("tree") {
-            let args = TreeArgs {};
-            tree::run_tree(args);
+            let mut args = TreeArgs {
+                thread_override: None,
+            };
+            with_ephemeral(stored, &thread, |tid_override| {
+                args.thread_override = tid_override;
+                tree::run_tree(args);
+            });
             continue;
         }
+
 
         // Default: skip, because parse_frs already consumed jots/branches
     }
@@ -115,4 +135,18 @@ fn parse_save_args(args: &[String]) -> crate::commands::save::SaveArgs {
     crate::commands::save::SaveArgs::parse_from(
         std::iter::once("save".to_string()).chain(args.to_owned())
     )
+}
+
+/// Run a command either with an ephemeral thread (if not stored) or directly.
+fn with_ephemeral<F>(stored: bool, thread: &crate::frs::ast::Thread, mut f: F)
+where
+    F: FnMut(Option<String>),
+{
+    if !stored {
+        let tid = crate::frs::persist::persist_ephemeral(thread);
+        f(Some(tid.clone()));
+        crate::frs::persist::cleanup_ephemeral(&tid);
+    } else {
+        f(None);
+    }
 }
