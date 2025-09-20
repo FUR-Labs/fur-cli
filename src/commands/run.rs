@@ -71,6 +71,7 @@ pub fn run_frs(path: &str) {
             }
 
             with_ephemeral(stored, &thread, |tid_override| {
+                let mut args = args.clone();
                 args.thread_override = tid_override;
                 timeline::run_timeline(args);
             });
@@ -81,6 +82,7 @@ pub fn run_frs(path: &str) {
         if line.starts_with("tree") {
             let mut args = TreeArgs { thread_override: None };
             with_ephemeral(stored, &thread, |tid_override| {
+                let mut args = args.clone();
                 args.thread_override = tid_override;
                 tree::run_tree(args);
             });

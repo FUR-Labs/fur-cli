@@ -6,13 +6,13 @@ use std::collections::HashMap;
 use crate::frs::avatars::resolve_avatar;
 use colored::*;
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct TreeArgs {
     #[clap(skip)]
     pub thread_override: Option<String>,
 }
 
-pub fn run_tree(_args: TreeArgs) {
+pub fn run_tree(args: TreeArgs) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
 
@@ -29,7 +29,7 @@ pub fn run_tree(_args: TreeArgs) {
     let thread_id = if let Some(ref override_id) = args.thread_override {
         override_id
     } else {
-        index["active_thread"].as_str().unwrap_or("")
+        index_data["active_thread"].as_str().unwrap_or("")
     };
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
     let thread_data: Value =

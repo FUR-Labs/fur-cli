@@ -6,6 +6,7 @@ use std::path::Path;
 use std::io::{self, Write};
 
 use crate::frs::ast::{Thread, Message};
+use crate::frs::ast::ScriptItem;
 
 /// Persist a parsed Thread into .fur/threads + .fur/messages
 pub fn persist_frs(thread: &Thread) -> String {

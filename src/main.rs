@@ -129,7 +129,11 @@ fn main() {
 
         Commands::New { name } => new::run_new(name),
 
-        Commands::Status {} => status::run_status(),
+        Commands::Status {} => {
+            let args = status::StatusArgs { thread_override: None };
+            status::run_status(args);
+        }
+
 
         Commands::Thread(args) => thread::run_thread(args),
 

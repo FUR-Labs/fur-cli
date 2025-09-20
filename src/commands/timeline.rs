@@ -11,7 +11,7 @@ use crate::renderer::{
 
 
 /// Args for timeline command
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct TimelineArgs {
     #[arg(short, long)]
     pub verbose: bool,
@@ -23,7 +23,6 @@ pub struct TimelineArgs {
     #[clap(skip)]
     pub thread_override: Option<String>,
 }
-
 
 
 /// Main entry for timeline
