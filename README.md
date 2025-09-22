@@ -9,6 +9,10 @@
 Like git, but for conversations, ideas, and AI chats.
 </p>
 
+<p align="center">
+  👉 For a more visual overview, see the <a href="https://furchats.vercel.app/">FURChats portfolio site</a>.
+</p>
+
 ---
 
 ## 🤔 What is FUR?
