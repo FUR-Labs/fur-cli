@@ -9,18 +9,17 @@
 Like git, but for conversations, ideas, and AI chats.
 </p>
 
-
-
 ---
 
 ## 🤔 What is FUR?
 
-Scrolling through endless chats to find that one reply is painful.
+Scrolling through endless chats to find that one reply is painful.  
 FUR makes it easy to **track, branch, and preserve** your conversations as trees you can navigate, fork, and export.
 
 With FUR you can:
 
 * **Jot** quick notes or attach Markdown files.
+* **Chat** long-form messages interactively (paste documents straight in).
 * **Branch & fork** conversations into multiple futures.
 * **Jump** backward or forward to any message.
 * **See** threads as timelines or trees.
@@ -33,14 +32,17 @@ Think of it as a **version control system for your thoughts**.
 
 ---
 
-## 🌟 What’s New in v0.3.0
+## 🌟 What’s New in v0.3.5 — Enter the Chat Den 🦊💬
 
-**Highlights**
+* **`fur chat`** → interactive, long-form jotting.  
+  Paste Markdown, essays, or multi-line rants directly into the CLI.  
+  By default, FUR suggests saving inside a `chats/` folder.  
 
-* **`.frs` scripting** → Write branching chats declaratively and load them into FUR.
-* **Import / export** → Save any thread back into `.frs` or load existing ones.
-* **Rich exports** → Export timelines to Markdown or PDF, with branches preserved.
-* **FurScript syntax highlighting** → Official [VS Code extension](https://marketplace.visualstudio.com/items?itemName=andrewgarcia.fur-frs) for `.frs` files.
+* **Better ergonomics** → `chat` is the natural sibling of `jot`.  
+  - `fur jot` → quick scratches.  
+  - `fur chat` → longer tales.  
+
+* **Tests** → new `tests/chat.rs` covers file + message creation.  
 
 ---
 
@@ -48,10 +50,10 @@ Think of it as a **version control system for your thoughts**.
 
 FUR keeps everything inside a local `.fur/` folder:
 
-* `.fur/index.json` → global state
-* `.fur/threads/*.json` → one per thread
-* `.fur/messages/*.json` → one per message
-* `.fur/avatars.json` → avatar mappings
+* `.fur/index.json` → global state  
+* `.fur/threads/*.json` → one per thread  
+* `.fur/messages/*.json` → one per message  
+* `.fur/avatars.json` → avatar mappings  
 
 ### Example commands
 
@@ -64,58 +66,28 @@ fur avatar andrew               # set yourself (🦊 main)
 fur avatar tengu --emoji 👺     # create a custom avatar with emoji
 fur avatar --view
 
-# Jot a message as yourself (🦊)
+# Quick jot
 fur jot "Just finished reading about quantum time crystals."
 
-# Jot a message as a custom avatar (👤 or 🤖 depending on name/emoji)
+# Jot as a custom avatar
 fur jot dr-strange "We’re in the endgame now."
 
-# Attach a markdown file
+# Long-form interactive jot (paste Markdown or docs)
+fur chat gpt5
+
+# Attach an existing markdown file
 fur jot ai-helper --file examples/chats/QUANTUM_MANIFESTO.md
 
-# Provide both text and file (text will show in timeline, file in exports)
-fur jot ai-helper "Here’s the updated draft." --file examples/chats/QUANTUM_MANIFESTO.md
-
-# Longform main user entry (text + equations doc)
-fur jot --text "Nonlocality still breaks my brain." --markdown examples/chats/ENTANGLEMENT_EQS.md
-
 # Work with scripts
-fur load examples/quantum_playground.frs
-fur save --out meeting_notes.frs
+fur run examples/quantum_playground.frs
+# or just:
+fur examples/quantum_playground.frs
 
 # Export views
-fur timeline --contents --out convo.md
+fur timeline --contents --out CONVO.md
 fur timeline --contents --out convo.pdf
-```
 
----
 
-## 📂 Examples
-
-The repo ships with an `examples/` directory full of ready-to-run `.frs` scripts and linked Markdown files.
-These make it easy to try FUR without writing anything from scratch.
-
-```bash
-# Quantum demo with multiple AI avatars + branching
-fur load examples/quantum_playground.frs
-fur timeline --contents
-
-# Outer-wordly penguin encounter
-fur load examples/penguin_verses.frs
-fur tree
-
-# Practical meeting notes - with attached report
-fur load examples/department_meeting.frs
-fur timeline --out meeting.pdf
-```
-
-Contents include:
-
-* **Quantum Playground** → cinematic physics, math, and startup pitch branches
-* **Penguin Verses** → recursive alien penguin gospel, with linked docs like *Meeponomicon*
-* **Department Meeting** → structured business chat w/ attached summary report
-* **Dad Jokes** → humor tree with branching punchlines
-* Plus extra flavor texts in `examples/chats/` (manifestos, equations, poems, absurdities)
 
 ---
 
