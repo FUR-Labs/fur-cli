@@ -1,8 +1,10 @@
 /target
+*.zip 
 
 # FUR versioning (ironic/poetic isn't it?)
 .fur
 fur/
+chats/
 *TIMELINE.md
 
 # YGG / FUR

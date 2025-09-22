@@ -1,6 +1,7 @@
 pub mod avatar;
 pub mod new;
 pub mod jot;
+pub mod chat;
 pub mod timeline;
 pub mod fork;
 pub mod status;

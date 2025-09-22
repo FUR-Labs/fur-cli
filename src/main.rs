@@ -8,6 +8,7 @@ use std::io;
 use crate::commands::{
     avatar,
     jot::{self, JotArgs},
+    chat,
     jump::{self, JumpArgs},
     timeline::{self, TimelineArgs},
     fork,
@@ -18,6 +19,7 @@ use crate::commands::{
     thread,
     run,
 };
+
 
 #[derive(Parser)]
 #[command(
@@ -86,6 +88,11 @@ enum Commands {
     /// Add a new message or link a markdown file
     Jot(JotArgs),
 
+    Chat {
+    /// Avatar name (defaults to "main")
+        avatar: Option<String>,
+    },
+
     /// Show the thread as a linear timeline
     Timeline(TimelineArgs),
 
@@ -152,6 +159,10 @@ fn main() {
         }
 
         Commands::Jot(args) => jot::run_jot(args),
+        
+        Commands::Chat { avatar } => {
+            chat::run_chat(avatar);
+        }
 
         Commands::Timeline(args) => timeline::run_timeline(args),
 
