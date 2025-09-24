@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
 use clap::Parser;
+use crate::renderer::list::render_list;
 
 /// Arguments for the `thread` command
 #[derive(Parser)]
@@ -31,24 +32,30 @@ pub fn run_thread(args: ThreadArgs) {
     // VIEW ALL THREADS
     // ------------------------
     if args.view || args.id.is_none() {
-        println!("📇 Threads in .fur:");
-
         let empty_vec: Vec<Value> = Vec::new();
         let threads = index["threads"].as_array().unwrap_or(&empty_vec);
         let active = index["active_thread"].as_str().unwrap_or("");
 
-        for tid in threads {
+        let mut rows = Vec::new();
+        let mut active_idx = None;
+
+        for (i, tid) in threads.iter().enumerate() {
             if let Some(tid_str) = tid.as_str() {
                 let thread_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
                 if let Ok(content) = fs::read_to_string(thread_path) {
                     if let Ok(thread_json) = serde_json::from_str::<Value>(&content) {
                         let title = thread_json["title"].as_str().unwrap_or("Untitled");
-                        let marker = if tid_str == active { "⭐ Active" } else { " " };
-                        println!("{marker} {tid_str:.8}  \"{title}\"");
+                        let short_id = &tid_str[..8];
+                        rows.push(vec![short_id.to_string(), title.to_string()]);
+                        if tid_str == active {
+                            active_idx = Some(i);
+                        }
                     }
                 }
             }
         }
+
+        render_list("Threads", &["ID", "Title"], rows, active_idx);
         return;
     }
 

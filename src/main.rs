@@ -20,7 +20,6 @@ use crate::commands::{
     run,
 };
 
-
 #[derive(Parser)]
 #[command(
     name = "fur",
@@ -31,6 +30,10 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
+
+
+
+
 
 #[derive(Subcommand)]
 enum Commands {
@@ -43,18 +46,10 @@ enum Commands {
 
     /// Manage avatars
     Avatar {
-        /// The name of the avatar (e.g., "james", "ai", "girlfriend")
-        avatar: Option<String>,
+        #[command(subcommand)]
+        action: Option<AvatarAction>,
 
-        /// Flag for creating non-main avatars
-        #[arg(short, long)]
-        other: bool,
-
-        /// Emoji for the avatar
-        #[arg(short, long)]
-        emoji: Option<String>,
-
-        /// View all avatars
+        /// View all avatars (alias for `fur avatar`)
         #[arg(long)]
         view: bool,
     },
@@ -108,6 +103,14 @@ enum Commands {
     Save(SaveArgs),
 }
 
+
+#[derive(Subcommand)]
+enum AvatarAction {
+    /// Create a new avatar (interactive onboarding)
+    New,
+}
+
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -130,9 +133,14 @@ fn main() {
             }
         }
 
-        Commands::Avatar { avatar, other, emoji, view } => {
-            avatar::run_avatar(avatar, other, emoji, view);
+
+        Commands::Avatar { action, view: _ } => {
+            match action {
+                Some(AvatarAction::New) => avatar::run_avatar_new(),
+                None => avatar::run_avatar(), // default and --view both land here
+            }
         }
+
 
         Commands::New { name } => new::run_new(name),
 
