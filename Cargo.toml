@@ -1,6 +1,6 @@
 [package]
 name = "fur-cli"
-version = "0.3.6"
+version = "0.3.7"
 edition = "2021"
 authors = ["Andrew Garcia"]
 description = "FUR — a forkable, unearthable, recursive memory tracker for your local chat logs"
@@ -24,6 +24,8 @@ chrono = "0.4"
 rand = "0.9.2"
 colored = "3.0.0"
 emojis = "0.6"
+walkdir = "2.5.0"
+dirs = "6.0.0"
 
 [dev-dependencies]
 assert_cmd = "2"

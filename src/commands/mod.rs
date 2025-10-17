@@ -9,4 +9,5 @@ pub mod thread;
 pub mod jump;
 pub mod tree;
 pub mod save;
+pub mod sweep;
 pub mod run;

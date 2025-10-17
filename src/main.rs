@@ -15,6 +15,7 @@ use crate::commands::{
     status,
     tree::{self, TreeArgs},
     save::{self, SaveArgs},
+    sweep::{self, SweepArgs},
     new,
     thread,
     run,
@@ -64,6 +65,7 @@ enum Commands {
     Status {},
 
     /// Manage threads (list or switch)
+    #[command(visible_alias = "convo")]
     Thread(thread::ThreadArgs),
 
     /// Fork the current message into a new thread
@@ -98,6 +100,10 @@ enum Commands {
     Run {
         path: String,
     },
+
+    /// Sweep filesystem for FUR projects
+    Sweep(SweepArgs),
+
 
     /// Save threads/messages
     Save(SaveArgs),
@@ -179,6 +185,8 @@ fn main() {
         Commands::Run { path } => {
             run::run_frs(&path);
         }
+
+        Commands::Sweep(args) => sweep::run_sweep(args),
 
         Commands::Save(args) => save::run_save(args),
     }

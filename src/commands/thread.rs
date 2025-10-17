@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use serde_json::{Value, json};
 use clap::Parser;
+use chrono::{DateTime, Local, Utc};
 use crate::renderer::list::render_list;
 
 /// Arguments for the `thread` command
@@ -39,23 +40,59 @@ pub fn run_thread(args: ThreadArgs) {
         let mut rows = Vec::new();
         let mut active_idx = None;
 
-        for (i, tid) in threads.iter().enumerate() {
+        // Collect thread metadata first
+        let mut thread_info = Vec::new();
+        for tid in threads {
             if let Some(tid_str) = tid.as_str() {
                 let thread_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
                 if let Ok(content) = fs::read_to_string(thread_path) {
                     if let Ok(thread_json) = serde_json::from_str::<Value>(&content) {
-                        let title = thread_json["title"].as_str().unwrap_or("Untitled");
-                        let short_id = &tid_str[..8];
-                        rows.push(vec![short_id.to_string(), title.to_string()]);
-                        if tid_str == active {
-                            active_idx = Some(i);
-                        }
+                        let title = thread_json["title"].as_str().unwrap_or("Untitled").to_string();
+                        let created_raw = thread_json["created_at"].as_str().unwrap_or("");
+                        let msg_count = thread_json["messages"]
+                            .as_array()
+                            .map(|a| a.len())
+                            .unwrap_or(0);
+
+                        // Parse created_at safely
+                        let parsed_time = DateTime::parse_from_rfc3339(created_raw)
+                            .map(|dt| dt.with_timezone(&Utc))
+                            .unwrap_or_else(|_| Utc::now());
+                        let local_time: DateTime<Local> = DateTime::from(parsed_time);
+                        let date_str = local_time.format("%Y-%m-%d").to_string();
+                        let time_str = local_time.format("%H:%M").to_string();
+
+                        thread_info.push((
+                            tid_str.to_string(),
+                            title,
+                            date_str,
+                            time_str,
+                            msg_count,
+                            parsed_time,
+                        ));
                     }
                 }
             }
         }
 
-        render_list("Threads", &["ID", "Title"], rows, active_idx);
+        // Sort newest → oldest
+        thread_info.sort_by(|a, b| b.5.cmp(&a.5));
+
+        // Build rows and track active index
+        for (i, (tid, title, date, time, msg_count, _)) in thread_info.iter().enumerate() {
+            let short_id = &tid[..8];
+            rows.push(vec![
+                short_id.to_string(),
+                title.to_string(),
+                format!("{} | {}", date, time),
+                msg_count.to_string(),
+            ]);
+            if tid == active {
+                active_idx = Some(i);
+            }
+        }
+
+        render_list("Threads", &["ID", "Title", "Created", "#Msgs"], rows, active_idx);
         return;
     }
 
@@ -71,16 +108,9 @@ pub fn run_thread(args: ThreadArgs) {
             .filter_map(|t| t.as_str().map(|s| s.to_string()))
             .collect();
 
-        // Try exact match first
         let mut found = threads.iter().find(|&s| s == &tid);
-
-        // If no exact match, try prefix match
         if found.is_none() {
-            let matches: Vec<&String> = threads
-                .iter()
-                .filter(|s| s.starts_with(&tid))
-                .collect();
-
+            let matches: Vec<&String> = threads.iter().filter(|s| s.starts_with(&tid)).collect();
             if matches.len() == 1 {
                 found = Some(matches[0]);
             } else if matches.len() > 1 {
@@ -97,7 +127,6 @@ pub fn run_thread(args: ThreadArgs) {
             }
         };
 
-        // ✅ Now we can safely mutate index
         index["active_thread"] = json!(tid_full);
         index["current_message"] = serde_json::Value::Null;
         fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
