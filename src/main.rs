@@ -102,6 +102,7 @@ enum Commands {
     },
 
     /// Sweep filesystem for FUR projects
+    #[command(visible_alias = "scan")]
     Sweep(SweepArgs),
 
 
