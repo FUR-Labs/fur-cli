@@ -103,7 +103,7 @@ pub fn run_jot(args: JotArgs) {
     // Display confirmation
     let (_, emoji) = resolve_avatar(&avatars, &avatar_name);
     println!(
-        "✍️ Message jotted: [{}] {} [{}] {}",
+        "✍️ Message jotted down: [{}] {} [{}] {}",
         &message_id[..8],
         thread_id,
         avatar_name,
