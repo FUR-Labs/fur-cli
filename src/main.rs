@@ -26,6 +26,7 @@ use crate::commands::{
 #[derive(Parser)]
 #[command(
     name = "fur",
+    version,
     about = "FUR — Forkable, Unearthable, Recursive memory tracker",
     long_about = "Track, branch, and link your conversations, especially AI chats, using local files and JSON. Think of it like git for your ideas."
 )]
@@ -156,8 +157,8 @@ fn main() {
 
         Commands::Avatar { action, view: _ } => {
             match action {
-                Some(AvatarAction::New) => avatar::run_avatar_new(),
-                None => avatar::run_avatar(), // default and --view both land here
+                Some(AvatarAction::New) => avatar::run_avatar_onboarding(),
+                None => avatar::run_avatar_view(), // default and --view both land here
             }
         }
 
