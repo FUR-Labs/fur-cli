@@ -1,45 +1,25 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
-use uuid::Uuid;
-use chrono::Utc;
 use serde_json::{json, Value};
+use uuid::Uuid;
 use colored::*;
 
+use crate::schema::{make_index_metadata, make_thread_metadata};
 use crate::frs::avatars::{load_avatars, save_avatars, get_random_emoji_for_name};
-
-
-fn make_index_metadata() -> Value {
-    json!({
-        "threads": [],
-        "active_thread": null,
-        "created_at": Utc::now().to_rfc3339(),
-        "schema_version": "0.2"
-    })
-}
-
-fn make_thread_metadata(name: &str, id: &str) -> Value {
-    json!({
-        "id": id,
-        "created_at": Utc::now().to_rfc3339(),
-        "messages": [],
-        "tags": [],
-        "title": name,
-    })
-}
-
 
 fn init_fur_dir(fur_dir: &Path) -> io::Result<()> {
     fs::create_dir_all(fur_dir.join("threads"))?;
     fs::create_dir_all(fur_dir.join("messages"))?;
+
     let mut f = File::create(fur_dir.join("index.json"))?;
-    f.write_all(make_index_metadata().to_string().as_bytes())?;
+    let initial_index = make_index_metadata();
+    f.write_all(serde_json::to_string_pretty(&initial_index)?.as_bytes())?;
     Ok(())
 }
 
-
 pub fn onboarding_interactive() -> (String, String) {
-    // === Main Avatar ===
+    // Main avatar
     println!("\n{}", "== Main Avatar ==".bright_magenta().bold());
     println!(
         "{}",
@@ -121,6 +101,7 @@ fn run_new_internal(
 
     if !fur_dir.exists() {
         init_fur_dir(fur_dir).expect("Failed to create .fur structure");
+        println!("{}", "[INIT] .fur/ directory created".bright_green().bold());
 
         if auto {
             onboarding_auto(
@@ -140,23 +121,26 @@ fn run_new_internal(
     }
 
     let thread_id = Uuid::new_v4().to_string();
-    let meta = make_thread_metadata(&name, &thread_id);
+    let thread_meta = make_thread_metadata(&name, &thread_id);
 
     // --- Write thread ---
     let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    File::create(&thread_path)
-        .and_then(|mut f| f.write_all(meta.to_string().as_bytes()))
+    fs::write(&thread_path, serde_json::to_string_pretty(&thread_meta).unwrap())
         .expect("Could not write thread file");
 
     // --- Update index ---
     let index_path = fur_dir.join("index.json");
     let mut index: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
-    index["threads"].as_array_mut().unwrap().push(thread_id.clone().into());
-    index["active_thread"] = thread_id.clone().into();
+
+    if let Some(arr) = index["threads"].as_array_mut() {
+        arr.push(json!(thread_id.clone()));
+    } else {
+        index["threads"] = json!([thread_id.clone()]);
+    }
+    index["active_thread"] = json!(thread_id.clone());
     index["current_message"] = Value::Null;
-    File::create(index_path)
-        .and_then(|mut f| f.write_all(index.to_string().as_bytes()))
-        .unwrap();
+
+    fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
 
     println!(
         "{}",
