@@ -3,6 +3,7 @@ pub mod new;
 pub mod jot;
 pub mod chat;
 pub mod timeline;
+pub mod printed;
 pub mod fork;
 pub mod status;
 pub mod thread;

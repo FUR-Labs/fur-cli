@@ -1,6 +1,7 @@
 mod commands;
 mod renderer;
 mod frs;
+mod schema;
 
 use clap::{Parser, Subcommand, CommandFactory};
 use clap_complete::{generate, shells::{Bash, Zsh, Fish}};
@@ -11,6 +12,7 @@ use crate::commands::{
     chat,
     jump::{self, JumpArgs},
     timeline::{self, TimelineArgs},
+    printed,
     fork,
     status,
     tree::{self, TreeArgs},
@@ -92,6 +94,17 @@ enum Commands {
 
     /// Show the thread as a linear timeline
     Timeline(TimelineArgs),
+
+    /// Export current thread as Markdown or PDF (shortcut for `fur timeline --contents --out`)
+    Printed {
+        /// Optional output file name (e.g., notes.md or report.pdf)
+        #[arg(help = "Output file path (.md or .pdf)", required = false)]
+        out: Option<String>,
+
+        /// Verbose flag (passthrough)
+        #[arg(short, long)]
+        verbose: bool,
+    },
 
     /// Show the thread as a branching tree
     Tree(TreeArgs),
@@ -180,6 +193,8 @@ fn main() {
         }
 
         Commands::Timeline(args) => timeline::run_timeline(args),
+
+        Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
 
         Commands::Tree(args) => tree::run_tree(args),
 
