@@ -4,9 +4,10 @@
 </p>
 
 <h1 align="center">FUR</h1>
+
 <p align="center">
-  <strong>Forkable, Unearthable, Recursive memory tracker</strong><br/>
-Like git, but for conversations, ideas, and AI chats.
+  <strong>Your AI conversation diary, organized and searchable</strong><br/>
+  A simple tool that turns scattered chats into clean, browsable digital diaries.
 </p>
 
 <p align="center">
@@ -17,116 +18,98 @@ Like git, but for conversations, ideas, and AI chats.
 
 ## 🤔 What is FUR?
 
-Scrolling through endless chats to find that one reply is painful.  
-FUR makes it easy to **track, branch, and preserve** your conversations as trees you can navigate, fork, and export.
+FUR is a lightweight tool that helps you **organize your AI chats into diaries** — each diary containing multiple conversations you can revisit, navigate, and export.
 
-With FUR you can:
+Instead of endless scrolling through chat history, FUR gives you:
 
-* **Jot** quick notes or attach Markdown files.
-* **Chat** long-form messages interactively (paste documents straight in).
-* **Branch & fork** conversations into multiple timelines.
-* **Jump** backward or forward to any message.
-* **See** threads as timelines or trees.
-* **Switch** between multiple threads easily.
-* **Assign avatars** (🦊 you, 🤖 bots, 👤 others — customizable).
-* **Script conversations with `.frs` files**.
-* **Export** threads to Markdown or PDF.
-* **(New)** Use **Git passthrough commands** directly through FUR.
-* **(New)** View **Git status** integrated into `fur status` when inside a Git repo.
+✅ multiple diaries  
+✅ each diary containing its own conversations  
+✅ every conversation cleanly structured  
+✅ easy navigation, timelines, and exports  
+✅ memory you can actually *use* later
 
-Think of it as a **version control system for your thoughts** — with optional Git integration when you want it.
+Think of it as **your AI companion's journal**, stored locally, under your control.
 
----
+No cloud.  
+No syncing.  
+No mystery.  
 
-## 🌟 What’s New in v0.4.1 — Git-Powered Status & Passthrough ⚡
-
-### ✅ Git-enhanced `fur status`
-If the project is inside a Git repository, `fur status` now:
-
-* Shows your active FUR thread *and*  
-* Shows `git status` output (fully colorized and real Git output)
-
-No changes if there’s no `.git` — FUR stays minimal.
+Just clean **conversation tracking**, built for people who think with AI.
 
 ---
 
-### ✅ Git passthrough commands (optional, zero-config)
+## 🌟 What can FUR do?
 
-FUR now exposes thin wrappers for common Git commands:
+### **Write**
+- **Jot** quick notes  
+- **Chat** long-form messages or paste documents  
+- **Attach Markdown** files  
+- **Save** conversations as portable `.frs` scripts  
 
-```bash
-fur add <args...>
-fur commit <args...>
-fur push <args...>
-fur pull <args...>
-```
+### **Organize**
+- Create **multiple diaries** (`fur new`)  
+- Assign **avatars/personas**  
+- Jump to any message  
+- View conversations as **timelines** or **trees**  
+- Switch quickly between diaries  
 
-Everything after the subcommand is forwarded **raw** to Git:
+### **Export**
+- Save conversations as **Markdown**  
+- Generate **PDF timelines**  
+- Script entire conversations using `.frs`
 
-* `fur commit -m "message"`
-* `fur commit --amend`
-* `fur add .`
-* `fur push --force-with-lease`
+### **Optional Git enhancements**  
+If your FUR project lives inside a Git repo, you also get:
 
-Flags, hyphens, editor opens — everything works exactly like native git.
+- `fur status` showing Git status  
+- passthrough commands (`fur add`, `fur commit`, etc.)
 
-If no `.git` repo is found:
-
-```
-⚠️  No Git repository detected in this project.
-```
-
-Git passthrough is strictly **opt-in**.
-FUR does not modify `.gitignore` and never writes to Git config.
+...but Git is **never required**.  
+FUR works perfectly without it.
 
 ---
 
 ## 🛠 How it works
 
-FUR keeps everything inside a local `.fur/` folder:
+FUR stores everything inside a small local folder:
 
-* `.fur/index.json` → global state
-* `.fur/threads/*.json` → one file per thread
-* `.fur/messages/*.json` → one file per message
-* `.fur/avatars.json` → avatar mappings
+* `.fur/index.json` → list of diaries  
+* `.fur/threads/*.json` → one file per diary  
+* `.fur/messages/*.json` → messages inside each diary  
+* `.fur/avatars.json` → your persona mapping  
 
-This folder is **local**, simple, and human-readable.
+Everything is **human-readable**, portable, and version-safe.
 
-### Example commands
+---
+
+## 📘 Example workflow
 
 ```bash
-# Start fresh
-fur new "Penguin talks"
+# Create a new AI diary
+fur new "My GPT-5 Notes"
 
-# Manage avatars
-fur avatar andrew            # set yourself (🦊 main)
-fur avatar tengu --emoji 👺  # create custom avatar
-fur avatar --view
+# Add quick jot
+fur jot "Deep learning troubleshooting ideas"
 
-# Quick jot
-fur jot "Just finished reading about quantum time crystals."
-
-# Jot with a custom avatar
-fur jot dr-strange "We’re in the endgame now."
-
-# Paste long text or Markdown interactively
+# Paste long chats or Markdown
 fur chat gpt5
+fur jot andrew --file notes/forecasting.md
 
-# Attach an existing Markdown file
-fur jot ai-helper --file examples/chats/QUANTUM_MANIFESTO.md
+# View as timeline
+fur timeline --contents
 
-# Run an .frs script
-fur run examples/quantum_playground.frs
+# Export to Markdown or PDF
+fur printed --out diary.md
+fur printed --out diary.pdf
 
-# Export views
-fur timeline --contents --out CONVO.md
-fur timeline --contents --out convo.pdf
+# Switch to another diary (alias 'thread')
+fur convo list
+fur convo switch research
 
-# Git passthrough (if inside a Git repo)
+# Optional: Git passthrough (if repo exists)
 fur add .
-fur commit -m "message"
+fur commit -m "Updated diaries"
 fur push
-fur status   # shows git status too
 ```
 
 ---
@@ -149,49 +132,43 @@ cargo install --path . --force
 
 ## 🐾 Philosophy
 
-FUR is **minimal**.
-It's not an AI client. It's a **memory tracker** that respects:
+FUR isn't trying to be an AI client or a chat interface.
 
-* Your brain's tendency to branch.
-* Your need to retrace steps.
-* Your desire to keep *everything*.
+It's something simpler:
 
-Git integration is optional — FUR uses it only when present, and gets out of the way when not.
+**A place to keep your conversations with clarity.**
 
-**Goal:** Make recursive thinking natural.
+Your chats — with AI, with yourself, with collaborators — deserve structure.
+FUR gives them a home.
+
+*Fast.*
+*Local.*
+*Searchable.*
+*Yours.*
 
 ---
 
 ## 🛣 Roadmap to v1.0
 
-✅ **Already complete (v0.4)**
+✅ **Already complete**
 
-* Threads (`fur new`, `fur thread`)
-* Avatars (`fur avatar`)
-* Jot & Chat (`fur jot`, `fur chat`)
-* Trees & Timelines
-* Forking & jumping
-* `.frs` scripting system
-* Thread import/export
-* PDF & Markdown exports
-* Git passthrough (add/commit/push/pull)
-* Git-enhanced `fur status`
+* Multiple diaries & conversations
+* Avatars / personas
+* Timelines & trees
+* Jot & chat modes
+* Jump navigation
+* `.frs` scripting
+* Markdown & PDF exports
+* Optional Git passthrough
 
-🔜 **Planned for future releases**
+🔜 **Planned**
 
-* `fur rm` → delete messages in the CLI
-* `fur move` → reorder/replace messages
-* `fur branch` → interactive branch creation
-* More editing tools
-* Richer exports (metadata, tags, avatars)
-* Optional helper: `fur gitignore`
-
-🎉 **v1.0 Milestone**
-
-* Full editing suite
-* Round-trip-safe `.frs` import/export
-* Robust test coverage
-* Consider cross-platform packaging (Homebrew, Scoop, etc.)
+* Message deletion & editing
+* Diary-level tagging
+* Richer export layouts
+* Search improvements
+* Optional helper for Git ignore rules
+* Cross-platform installers
 
 ---
 

@@ -29,144 +29,137 @@ use crate::commands::{
 #[command(
     name = "fur",
     version,
-    about = "FUR — Forkable, Unearthable, Recursive memory tracker",
-    long_about = "Track, branch, and link your conversations, especially AI chats, using local files and JSON. Think of it like git for your ideas."
+    about = "FUR: AI Conversation Control System",
+    long_about = "FUR turns your AI conversations into a digital diary. A solution to the long-term memory problem of AI chats."
 )]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
 
-
-
-
-
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate shell completions
+    // Hidden completions
     #[command(hide = true)]
     Completions {
         #[arg(value_parser = ["bash", "zsh", "fish"])]
         shell: String,
     },
 
-    /// Manage avatars
-    Avatar {
-        #[command(subcommand)]
-        action: Option<AvatarAction>,
-
-        /// View all avatars (alias for `fur avatar`)
-        #[arg(long)]
-        view: bool,
-    },
-
-    /// Start a new conversation
-    New {
-        #[arg(help = "Name for the new thread")]
-        name: String,
-    },
-
-    // Now: wrapping all common git commands as fur commands using Git passthrough 
+    // Git passthrough
     Status {},
-
     Add {
-        #[arg(trailing_var_arg = true)]
-        #[arg(allow_hyphen_values = true)]
-        #[arg(num_args(0..))]
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-
     Commit {
-        #[arg(trailing_var_arg = true)]
-        #[arg(allow_hyphen_values = true)]
-        #[arg(num_args(0..))]
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-
     Push {
-        #[arg(trailing_var_arg = true)]
-        #[arg(allow_hyphen_values = true)]
-        #[arg(num_args(0..))]
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-
     Pull {
-        #[arg(trailing_var_arg = true)]
-        #[arg(allow_hyphen_values = true)]
-        #[arg(num_args(0..))]
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
 
-    /// Manage threads (list or switch)
-    #[command(visible_alias = "convo")]
-    Thread(thread::ThreadArgs),
-
-    /// Fork the current message into a new thread
-    Fork {
-        /// ID of the message to fork from (optional)
-        #[arg(short, long, default_value = "")]
-        id: String,
-
-        /// Optional custom title for the new fork
-        #[arg(short, long)]
-        title: Option<String>,
-    },
-
-    /// Jump to another message in the thread
-    Jump(JumpArgs),
-
-    /// Add a new message or link a markdown file
+    // Everyday
+    #[command(about = "Everyday:: Start a new conversation (new convo)")]
+    New { name: String },
+    
+    #[command(about = "Everyday:: Jot something out (write short form in quotes)")]
     Jot(JotArgs),
 
-    Chat {
-    /// Avatar name (defaults to "main")
-        avatar: Option<String>,
-    },
+    #[command(about = "Everyday:: Paste a full chat (write long form)")]
+    Chat { avatar: Option<String> },
 
-    /// Show the thread as a linear timeline
+    #[command(about = "Everyday:: Print timeline of full conversation.")]
     Timeline(TimelineArgs),
 
-    /// Export current thread as Markdown or PDF (shortcut for `fur timeline --contents --out`)
+    #[command(about = "Everyday:: Export full conversation as Markdown")]
     Printed {
-        /// Optional output file name (e.g., notes.md or report.pdf)
-        #[arg(help = "Output file path (.md or .pdf)", required = false)]
         out: Option<String>,
-
-        /// Verbose flag (passthrough)
         #[arg(short, long)]
         verbose: bool,
     },
 
-    /// Show the thread as a branching tree
-    Tree(TreeArgs),
+    // Management
+    #[command(about = "Management:: See or create new conversation avatars/personas")]
 
-    /// Run an .frs script (import + execute)
-    Run {
-        path: String,
+    Avatar {
+        #[command(subcommand)]
+        action: Option<AvatarAction>,
+        #[arg(long)]
+        view: bool,
     },
 
-    /// Sweep filesystem for FUR projects
-    #[command(visible_alias = "scan")]
-    Sweep(SweepArgs),
+    #[command(about = "Management:: See or jump to any of your conversations", visible_alias = "thread")]
+    Convo(thread::ThreadArgs),
+    
+    #[command(about = "Management:: Tree of full conversation")]
+    Tree(TreeArgs),
+    #[command(visible_aliases = ["scan", "sweep"])]
 
+    #[command(about = "Management:: Global search of all your FUR projects (full PC, blazing fast)")]
+    Gsearch(SweepArgs),
 
-    /// Save threads/messages
+    // Scripting
+    #[command(about = "Scripting:: Run a .frs (FurScript) script with `fur <script.frs>`)")]
+    Run { path: String },
+    
+    #[command(about = "Scripting:: Save your conversation as a .frs script")]
     Save(SaveArgs),
 
-}
 
+    // Experimental
+    #[command(about = "Under development:: Fork / Copy")]
+    Fork {
+        #[arg(short, long, default_value = "")]
+        id: String,
+        #[arg(short, long)]
+        title: Option<String>,
+    },
+    #[command(about = "Under development:: Jump to specific chat within convo")]
+    Jump(JumpArgs),
+
+
+}
 
 #[derive(Subcommand)]
 enum AvatarAction {
-    /// Create a new avatar (interactive onboarding)
     New,
 }
 
+enum GitCmd {
+    Status,
+    Add(Vec<String>),
+    Commit(Vec<String>),
+    Push(Vec<String>),
+    Pull(Vec<String>),
+}
+
+fn dispatch_git(cmd: GitCmd) {
+    match cmd {
+        GitCmd::Status => {
+            let args = status::StatusArgs { thread_override: None };
+            status::run_status(args);
+            if let Some(repo) = utils::git::find_git_root() {
+                git::status::run_git_status(&repo);
+            }
+        }
+        GitCmd::Add(args)    => git::passthrough::passthrough("add", &args),
+        GitCmd::Commit(args) => git::passthrough::passthrough("commit", &args),
+        GitCmd::Push(args)   => git::passthrough::passthrough("push", &args),
+        GitCmd::Pull(args)   => git::passthrough::passthrough("pull", &args),
+    }
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    // === Shortcut: fur script.frs
+    // .frs shortcut
     if args.len() == 2 && args[1].ends_with(".frs") {
         run::run_frs(&args[1]);
         return;
@@ -185,77 +178,45 @@ fn main() {
             }
         }
 
+        Commands::Status {} => dispatch_git(GitCmd::Status),
+        Commands::Add { args } => dispatch_git(GitCmd::Add(args)),
+        Commands::Commit { args } => dispatch_git(GitCmd::Commit(args)),
+        Commands::Push { args } => dispatch_git(GitCmd::Push(args)),
+        Commands::Pull { args } => dispatch_git(GitCmd::Pull(args)),
+
+        Commands::New { name } => new::run_new(name),
+        Commands::Jot(a) => jot::run_jot(a),
+        Commands::Chat { avatar } => chat::run_chat(avatar),
+        Commands::Timeline(a) => timeline::run_timeline(a),
+        Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
 
         Commands::Avatar { action, view: _ } => {
             match action {
                 Some(AvatarAction::New) => avatar::run_avatar_onboarding(),
-                None => avatar::run_avatar_view(), // default and --view both land here
+                None => avatar::run_avatar_view(),
             }
         }
 
+        Commands::Convo(a) => thread::run_thread(a),
+        Commands::Tree(a) => tree::run_tree(a),
+        Commands::Gsearch(a) => sweep::run_sweep(a),
 
-        Commands::New { name } => new::run_new(name),
-
-        Commands::Status {} => {
-            let args = status::StatusArgs { thread_override: None };
-            status::run_status(args);
-
-            if let Some(repo) = utils::git::find_git_root() {
-                git::status::run_git_status(&repo);
-            }
-        }
-
-        Commands::Add { args } => {
-            git::passthrough::passthrough("add", &args);
-        }
-
-        Commands::Commit { args } => {
-            git::passthrough::passthrough("commit", &args);
-        }
-
-        Commands::Push { args } => {
-            git::passthrough::passthrough("push", &args);
-        }
-
-        Commands::Pull { args } => {
-            git::passthrough::passthrough("pull", &args);
-        }
-
-
-        Commands::Thread(args) => thread::run_thread(args),
+        Commands::Run { path } => run::run_frs(&path),
+        Commands::Save(a) => save::run_save(a),
 
         Commands::Fork { id, title } => {
             if id.is_empty() {
-                fork::run_fork_from_active(title.clone());
+                fork::run_fork_from_active(title);
             } else {
-                fork::run_fork(&id, title.clone());
+                fork::run_fork(&id, title);
             }
         }
 
-        Commands::Jump(args) => {
-            if let Err(e) = jump::run_jump(args) {
+        Commands::Jump(a) => {
+            if let Err(e) = jump::run_jump(a) {
                 eprintln!("Error: {}", e);
             }
         }
 
-        Commands::Jot(args) => jot::run_jot(args),
-        
-        Commands::Chat { avatar } => {
-            chat::run_chat(avatar);
-        }
-
-        Commands::Timeline(args) => timeline::run_timeline(args),
-
-        Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
-
-        Commands::Tree(args) => tree::run_tree(args),
-
-        Commands::Run { path } => {
-            run::run_frs(&path);
-        }
-
-        Commands::Sweep(args) => sweep::run_sweep(args),
-
-        Commands::Save(args) => save::run_save(args),
     }
 }
