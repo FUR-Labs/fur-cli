@@ -24,29 +24,60 @@ With FUR you can:
 
 * **Jot** quick notes or attach Markdown files.
 * **Chat** long-form messages interactively (paste documents straight in).
-* **Branch & fork** conversations into multiple futures.
+* **Branch & fork** conversations into multiple timelines.
 * **Jump** backward or forward to any message.
 * **See** threads as timelines or trees.
 * **Switch** between multiple threads easily.
 * **Assign avatars** (🦊 you, 🤖 bots, 👤 others — customizable).
 * **Script conversations with `.frs` files**.
 * **Export** threads to Markdown or PDF.
+* **(New)** Use **Git passthrough commands** directly through FUR.
+* **(New)** View **Git status** integrated into `fur status` when inside a Git repo.
 
-Think of it as a **version control system for your thoughts**.
+Think of it as a **version control system for your thoughts** — with optional Git integration when you want it.
 
 ---
 
-## 🌟 What’s New in v0.3.5 — Enter the Chat Den 🦊💬
+## 🌟 What’s New in v0.4.1 — Git-Powered Status & Passthrough ⚡
 
-* **`fur chat`** → interactive, long-form jotting.  
-  Paste Markdown, essays, or multi-line rants directly into the CLI.  
-  By default, FUR suggests saving inside a `chats/` folder.  
+### ✅ Git-enhanced `fur status`
+If the project is inside a Git repository, `fur status` now:
 
-* **Better ergonomics** → `chat` is the natural sibling of `jot`.  
-  - `fur jot` → quick scratches.  
-  - `fur chat` → longer tales.  
+* Shows your active FUR thread *and*  
+* Shows `git status` output (fully colorized and real Git output)
 
-* **Tests** → new `tests/chat.rs` covers file + message creation.  
+No changes if there’s no `.git` — FUR stays minimal.
+
+---
+
+### ✅ Git passthrough commands (optional, zero-config)
+
+FUR now exposes thin wrappers for common Git commands:
+
+```bash
+fur add <args...>
+fur commit <args...>
+fur push <args...>
+fur pull <args...>
+```
+
+Everything after the subcommand is forwarded **raw** to Git:
+
+* `fur commit -m "message"`
+* `fur commit --amend`
+* `fur add .`
+* `fur push --force-with-lease`
+
+Flags, hyphens, editor opens — everything works exactly like native git.
+
+If no `.git` repo is found:
+
+```
+⚠️  No Git repository detected in this project.
+```
+
+Git passthrough is strictly **opt-in**.
+FUR does not modify `.gitignore` and never writes to Git config.
 
 ---
 
@@ -54,10 +85,12 @@ Think of it as a **version control system for your thoughts**.
 
 FUR keeps everything inside a local `.fur/` folder:
 
-* `.fur/index.json` → global state  
-* `.fur/threads/*.json` → one per thread  
-* `.fur/messages/*.json` → one per message  
-* `.fur/avatars.json` → avatar mappings  
+* `.fur/index.json` → global state
+* `.fur/threads/*.json` → one file per thread
+* `.fur/messages/*.json` → one file per message
+* `.fur/avatars.json` → avatar mappings
+
+This folder is **local**, simple, and human-readable.
 
 ### Example commands
 
@@ -66,32 +99,35 @@ FUR keeps everything inside a local `.fur/` folder:
 fur new "Penguin talks"
 
 # Manage avatars
-fur avatar andrew               # set yourself (🦊 main)
-fur avatar tengu --emoji 👺     # create a custom avatar with emoji
+fur avatar andrew            # set yourself (🦊 main)
+fur avatar tengu --emoji 👺  # create custom avatar
 fur avatar --view
 
 # Quick jot
 fur jot "Just finished reading about quantum time crystals."
 
-# Jot as a custom avatar
+# Jot with a custom avatar
 fur jot dr-strange "We’re in the endgame now."
 
-# Long-form interactive jot (paste Markdown or docs)
+# Paste long text or Markdown interactively
 fur chat gpt5
 
-# Attach an existing markdown file
+# Attach an existing Markdown file
 fur jot ai-helper --file examples/chats/QUANTUM_MANIFESTO.md
 
-# Work with scripts
+# Run an .frs script
 fur run examples/quantum_playground.frs
-# or just:
-fur examples/quantum_playground.frs
 
 # Export views
 fur timeline --contents --out CONVO.md
 fur timeline --contents --out convo.pdf
 
-
+# Git passthrough (if inside a Git repo)
+fur add .
+fur commit -m "message"
+fur push
+fur status   # shows git status too
+```
 
 ---
 
@@ -120,7 +156,7 @@ It's not an AI client. It's a **memory tracker** that respects:
 * Your need to retrace steps.
 * Your desire to keep *everything*.
 
-Avatars keep things clear: 🦊 (you), 🤖 (AI/bots), 👤 (others). But you can always customize them (`fur avatar tengu --emoji 👺`).
+Git integration is optional — FUR uses it only when present, and gets out of the way when not.
 
 **Goal:** Make recursive thinking natural.
 
@@ -128,32 +164,33 @@ Avatars keep things clear: 🦊 (you), 🤖 (AI/bots), 👤 (others). But you ca
 
 ## 🛣 Roadmap to v1.0
 
-✅ **Already complete (v0.3)**
+✅ **Already complete (v0.4)**
 
 * Threads (`fur new`, `fur thread`)
 * Avatars (`fur avatar`)
-* Jotting text & files (`fur jot`)
-* Tree / Timeline views
-* Jumping & forking
-* `.frs` scripting system (branching supported here)
-* VS Code highlighting for `.frs`
-* Thread import / export
-* Markdown & PDF rendering
-* Polished exports (Markdown/PDF with styles, embedded assets)
+* Jot & Chat (`fur jot`, `fur chat`)
+* Trees & Timelines
+* Forking & jumping
+* `.frs` scripting system
+* Thread import/export
+* PDF & Markdown exports
+* Git passthrough (add/commit/push/pull)
+* Git-enhanced `fur status`
 
 🔜 **Planned for future releases**
 
-* `fur rm` → delete messages directly in the CLI
-* `fur move` → replace / reorder messages in a thread
-* `fur branch` → create branches interactively in the CLI (currently only in `.frs` scripts)
-* Interactive editing flows for power users
+* `fur rm` → delete messages in the CLI
+* `fur move` → reorder/replace messages
+* `fur branch` → interactive branch creation
+* More editing tools
 * Richer exports (metadata, tags, avatars)
+* Optional helper: `fur gitignore`
 
 🎉 **v1.0 Milestone**
 
-* Full editing suite: add, delete, move, replace, fork, branch — all stable
-* Rock-solid `.frs` import/export parity (round-trip safe)
-* Robust test coverage & docs
+* Full editing suite
+* Round-trip-safe `.frs` import/export
+* Robust test coverage
 * Consider cross-platform packaging (Homebrew, Scoop, etc.)
 
 ---
@@ -161,4 +198,3 @@ Avatars keep things clear: 🦊 (you), 🤖 (AI/bots), 👤 (others). But you ca
 ## 📜 License
 
 MIT, like almost everything else that's friendly and open-source.
-
