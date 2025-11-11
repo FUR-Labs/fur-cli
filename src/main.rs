@@ -2,6 +2,8 @@ mod commands;
 mod renderer;
 mod frs;
 mod schema;
+mod utils;
+mod git;
 
 use clap::{Parser, Subcommand, CommandFactory};
 use clap_complete::{generate, shells::{Bash, Zsh, Fish}};
@@ -64,8 +66,36 @@ enum Commands {
         name: String,
     },
 
-    /// Show current thread/message state
+    // Now: wrapping all common git commands as fur commands using Git passthrough 
     Status {},
+
+    Add {
+        #[arg(trailing_var_arg = true)]
+        #[arg(allow_hyphen_values = true)]
+        #[arg(num_args(0..))]
+        args: Vec<String>,
+    },
+
+    Commit {
+        #[arg(trailing_var_arg = true)]
+        #[arg(allow_hyphen_values = true)]
+        #[arg(num_args(0..))]
+        args: Vec<String>,
+    },
+
+    Push {
+        #[arg(trailing_var_arg = true)]
+        #[arg(allow_hyphen_values = true)]
+        #[arg(num_args(0..))]
+        args: Vec<String>,
+    },
+
+    Pull {
+        #[arg(trailing_var_arg = true)]
+        #[arg(allow_hyphen_values = true)]
+        #[arg(num_args(0..))]
+        args: Vec<String>,
+    },
 
     /// Manage threads (list or switch)
     #[command(visible_alias = "convo")]
@@ -122,6 +152,7 @@ enum Commands {
 
     /// Save threads/messages
     Save(SaveArgs),
+
 }
 
 
@@ -168,6 +199,26 @@ fn main() {
         Commands::Status {} => {
             let args = status::StatusArgs { thread_override: None };
             status::run_status(args);
+
+            if let Some(repo) = utils::git::find_git_root() {
+                git::status::run_git_status(&repo);
+            }
+        }
+
+        Commands::Add { args } => {
+            git::passthrough::passthrough("add", &args);
+        }
+
+        Commands::Commit { args } => {
+            git::passthrough::passthrough("commit", &args);
+        }
+
+        Commands::Push { args } => {
+            git::passthrough::passthrough("push", &args);
+        }
+
+        Commands::Pull { args } => {
+            git::passthrough::passthrough("pull", &args);
         }
 
 
