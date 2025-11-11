@@ -47,11 +47,11 @@ Just clean **conversation tracking**, built for people who think with AI.
 - **Save** conversations as portable `.frs` scripts  
 
 ### **Organize**
-- Create **multiple diaries** (`fur new`)  
+- Create a new **conversation** (`fur new`)  
 - Assign **avatars/personas**  
 - Jump to any message  
 - View conversations as **timelines** or **trees**  
-- Switch quickly between diaries  
+- Switch quickly between conversations 
 
 ### **Export**
 - Save conversations as **Markdown**  
@@ -73,7 +73,7 @@ FUR works perfectly without it.
 
 FUR stores everything inside a small local folder:
 
-* `.fur/index.json` → list of diaries  
+* `.fur/index.json` → list of conversations  
 * `.fur/threads/*.json` → one file per diary  
 * `.fur/messages/*.json` → messages inside each diary  
 * `.fur/avatars.json` → your persona mapping  
@@ -85,30 +85,32 @@ Everything is **human-readable**, portable, and version-safe.
 ## 📘 Example workflow
 
 ```bash
-# Create a new AI diary
+# Create a new AI conversation
 fur new "My GPT-5 Notes"
 
 # Add quick jot
 fur jot "Deep learning troubleshooting ideas"
 
-# Paste long chats or Markdown
+# Paste long chats
 fur chat gpt5
-fur jot andrew --file notes/forecasting.md
 
-# View as timeline
-fur timeline --contents
+# Quick jot with attached document
+fur jot "These notes are tied to what I learned in DSA" --file notes/DSA.md
 
-# Export to Markdown or PDF
-fur printed --out diary.md
-fur printed --out diary.pdf
+# See all conversations in your diary (.fur project)
+fur convo
+# Switch to another conversation (alias 'thread')
+fur convo <thread_id (first unique characters)>
 
-# Switch to another diary (alias 'thread')
-fur convo list
-fur convo switch research
+# Export your currently-tracked conversation to Markdown
+fur printed 
+
+# Global scan for all diaries in your computer (very fast)
+fur gsearch 
 
 # Optional: Git passthrough (if repo exists)
 fur add .
-fur commit -m "Updated diaries"
+fur commit -m "Updated conversations"
 fur push
 ```
 
@@ -152,7 +154,7 @@ FUR gives them a home.
 
 ✅ **Already complete**
 
-* Multiple diaries & conversations
+* Multiple diaries (.fur projects) & conversations
 * Avatars / personas
 * Timelines & trees
 * Jot & chat modes
