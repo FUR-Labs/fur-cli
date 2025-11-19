@@ -3,7 +3,7 @@ use predicates::prelude::*;
 use tempfile::tempdir;
 use std::fs;
 
-/// Helper: bootstrap a `.fur` directory in a temp folder
+// Helper: bootstrap a `.fur` directory in a temp folder
 fn setup_fur(tmp: &std::path::Path) {
     let fur_dir = tmp.join(".fur");
     fs::create_dir_all(&fur_dir).unwrap();

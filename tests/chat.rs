@@ -27,7 +27,7 @@ fn chat_creates_file_and_message() {
     std::env::set_current_dir(&tmp).unwrap();
     setup_fur(tmp.path());
 
-    // 1. Start a new thread so we have an active context
+    // 1. Start a new conversation so we have an active context
     Command::cargo_bin("fur").unwrap()
         .args(&["new", "Chat Test"])
         .assert()
