@@ -1,0 +1,23 @@
+# A new thread with branching options
+new "Weekend Plans"
+user = andrew
+tags = ["weekend", "plans"]
+
+# Root jot
+jot "What should I do this weekend?"
+
+branch {
+    jot "Stay home and read a book"
+    jot sonnet4.5 "Reading will help you recharge and learn something new."
+}
+
+branch {
+    jot "Go hiking in the mountains"
+    jot sonnet4.5 "Fresh air and movement are great for your mental health."
+}
+
+# Save
+store
+
+# Display branching tree
+tree

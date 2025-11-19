@@ -1,0 +1,22 @@
+# Planning a project timeline
+new "Project Alpha"
+user = blorbo
+tags = ["work", "project"]
+
+jot "Define scope and objectives"
+jot gpt5 "First, clarify deliverables and assign roles."
+jot "Set milestones"
+jot gpt5 "Break the work into sprints with review points."
+
+# Request a detailed outline and store it in a separate file
+jot "Give outline of the full proposal"
+jot gpt5 --file chats/FULL_OUTLINE.md
+
+# Save the conversation -- must always save before giving fur rendering commands
+store
+
+# Show timeline
+timeline
+
+# Export to Markdown
+timeline --contents --out project_alpha.md

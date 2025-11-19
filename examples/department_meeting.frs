@@ -35,3 +35,7 @@ jot sophia_hr "HR is clear for now."
 jot james_secretary "All noted in the minutes."
 
 jot carla_branch_manager "Excellent. Thank you, everyone. Let’s reconvene next month at the same time."
+
+# Store and print timeline
+store 
+timeline

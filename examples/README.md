@@ -13,16 +13,10 @@ The goal: demonstrate **versatility** and push FUR to its limits.
 
 ## Core Demos
 
-### 🐣 Dad Jokes
-- **Type:** Minimal demo  
-- **What it shows:** How to use FUR for the simplest possible branching structure.  
-- **Why it’s here:** A baseline test. If FUR can’t handle branching punchlines, it can’t handle anything bigger.  
-
-
 ### 🗂 Department Meeting
 - **Type:** Realistic corporate use case  
 - **What it shows:** A structured conversation across multiple avatars (finance, ops, HR), with hand-off to an attached Markdown report.  
-- **Why it’s here:** Demonstrates practical business applications of FUR — linking documentation into the thread and exporting professional notes.  
+- **Why it’s here:** Demonstrates practical business applications of FUR — linking documentation into the conversation and exporting professional notes.  
 
 
 ### 🐧 The Penguin Verses

@@ -1,0 +1,17 @@
+# Start a new thread called
+new "Morning Routine"
+
+# Define the main user
+user = over-achiever
+
+# Optional tags
+tags = ["daily", "habits"]
+
+# Write a jot
+jot "Wake up and make coffee"
+
+# Save so far
+store
+
+# Show conversation status
+status

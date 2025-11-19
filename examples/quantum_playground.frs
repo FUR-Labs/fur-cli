@@ -12,7 +12,7 @@ jot gpt5 "Entanglement is like two particles sharing one soul — measure one, a
 # Branch into different vibes
 branch {
   jot "Now make it sound cinematic."
-  jot claude --file chats/CINEMATIC_ENTANGLEMENT.md
+  jot sonnet4.5 --file chats/CINEMATIC_ENTANGLEMENT.md
 }
 
 branch {
@@ -28,5 +28,9 @@ branch {
 # Merge into a one-pager manifesto
 branch {
   jot "Summarize all this into something that would impress a VC."
-  jot claude --file chats/QUANTUM_MANIFESTO.md
+  jot sonnet4.5 --file chats/QUANTUM_MANIFESTO.md
 }
+
+# Store and see branching
+store 
+tree
