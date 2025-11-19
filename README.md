@@ -1,13 +1,20 @@
 <!-- LOGO -->
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c3582cb8-c1cc-41ab-9ed1-f8fbde4d8c21" width="200" alt="fur logo"/>
+
 </p>
 
+
 <h1 align="center">FUR</h1>
+
 
 <p align="center">
   <strong>Your AI conversation diary, organized and searchable</strong><br/>
   A simple tool that turns scattered chats into clean, browsable digital diaries.
+</p>
+
+<p align="center">
+  <img width="348" height="126" alt="fur_qwerty" src="https://github.com/user-attachments/assets/c5d65ac1-54b5-4357-b419-e1e3763b2a1d" />
 </p>
 
 <p align="center">
