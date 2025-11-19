@@ -7,8 +7,7 @@ use serde_json::Value;
 use crate::commands::timeline::TimelineArgs;
 use crate::renderer::utils::load_message;
 
-/// LaTeX preamble with fixes for Pandoc output + math + images
-fn latex_preamble(thread_title: &str) -> String {
+fn latex_preamble(conversation_title: &str) -> String {
     format!(
 r#"\documentclass[12pt]{{article}}
 \usepackage[margin=1in]{{geometry}}
@@ -40,22 +39,19 @@ r#"\documentclass[12pt]{{article}}
     \rule{{\linewidth}}{{0.4pt}}
 \end{{center}}
 "#,
-        title = thread_title
+        title = conversation_title
     )
 }
 
-/// Document ending
-fn latex_end() -> &'static str {
+fn latex_ending() -> &'static str {
     r#"\end{document}"#
 }
 
-/// Strip emojis and other non-ASCII that break pdflatex
-fn strip_emojis(input: &str) -> String {
+fn strip_emojis_n_nonascii(input: &str) -> String {
     input.chars().filter(|c| c.is_ascii() || c.is_alphanumeric() || c.is_whitespace()).collect()
 }
 
-/// Render a single message (recursively) into LaTeX
-pub fn render_message_tex(
+pub fn render_single_message_to_tex(
     fur_dir: &Path,
     msg_id: &str,
     label: String,        // e.g. "Root", "Root - Branch 1"
@@ -88,7 +84,7 @@ pub fn render_message_tex(
 
             // Always show text if it's non-empty
             if !msg.text.trim().is_empty() {
-                out += &format!("{}\n\n", escape(&strip_emojis(&msg.text)));
+                out += &format!("{}\n\n", escape(&strip_emojis_n_nonascii(&msg.text)));
             }
 
             // Try to render markdown as LaTeX
@@ -100,13 +96,13 @@ pub fn render_message_tex(
                     let latex_body = String::from_utf8_lossy(&output.stdout);
                     out += &format!(
                         "Attached document:\n\n\\begin{{quote}}\n{}\n\\end{{quote}}\n\\clearpage",
-                        strip_emojis(&latex_body)
+                        strip_emojis_n_nonascii(&latex_body)
                     );
                 }
                 _ => {
                     // Fallback to raw contents if Pandoc fails
                     let fallback = fs::read_to_string(path_str)
-                        .map(|s| escape(&strip_emojis(&s)))
+                        .map(|s| escape(&strip_emojis_n_nonascii(&s)))
                         .unwrap_or_else(|_| String::from("[Markdown file missing]"));
                     out += &format!("{}\n\\clearpage", fallback);
                 }
@@ -114,10 +110,10 @@ pub fn render_message_tex(
 
             out
         } else {
-            escape(&strip_emojis(&msg.text))
+            escape(&strip_emojis_n_nonascii(&msg.text))
         }
     } else {
-        escape(&strip_emojis(&msg.text))
+        escape(&strip_emojis_n_nonascii(&msg.text))
     };
 
     let mut full_content = base_content.clone();
@@ -154,16 +150,15 @@ pub fn render_message_tex(
         let branch_label = format!("{} - Branch {}", label, bi + 1);
 
         for cid in block {
-            render_message_tex(fur_dir, cid, branch_label.clone(), args, avatars, tex_out, depth + 1);
+            render_single_message_to_tex(fur_dir, cid, branch_label.clone(), args, avatars, tex_out, depth + 1);
         }
     }
 }
 
 
-/// Export a full thread to LaTeX and compile to PDF
-pub fn export_to_pdf(
+pub fn export_convo_to_pdf(
     fur_dir: &Path,
-    thread_title: &str,
+    conversation_title: &str,
     root_msgs: &[Value],
     args: &TimelineArgs,
     avatars: &Value,
@@ -173,17 +168,17 @@ pub fn export_to_pdf(
     let mut file = File::create(&tex_file).expect("❌ Failed to create .tex file");
 
     // Write preamble
-    file.write_all(latex_preamble(thread_title).as_bytes()).unwrap();
+    file.write_all(latex_preamble(conversation_title).as_bytes()).unwrap();
 
     // Write messages
     for mid in root_msgs {
         if let Some(mid_str) = mid.as_str() {
-            render_message_tex(fur_dir, mid_str, "Root".to_string(), args, avatars, &mut file, 0);
+            render_single_message_to_tex(fur_dir, mid_str, "Root".to_string(), args, avatars, &mut file, 0);
         }
     }
 
     // End document
-    file.write_all(latex_end().as_bytes()).unwrap();
+    file.write_all(latex_ending().as_bytes()).unwrap();
 
     // Compile with pdflatex
     Command::new("pdflatex")

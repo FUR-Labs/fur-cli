@@ -5,11 +5,11 @@ use crate::frs::avatars::resolve_avatar;
 
 type Map = HashMap<String, Value>;
 
-/// Print active thread title
-pub fn print_active_thread(index: &Value) {
+/// Print active conversation title
+pub fn print_active_conversation(index: &Value) {
     println!(
         "{} {} {}",
-        "Active thread:".bright_cyan().bold(),
+        "Active conversation:".bright_cyan().bold(),
         index["title"]
             .as_str()
             .unwrap_or("Untitled")
@@ -83,7 +83,7 @@ pub fn print_lineage(
 
 pub fn print_next_messages(
     map: &Map,
-    thread: &Value,
+    conversation: &Value,
     current: &str,
     avatars: &Value,
 ) {
@@ -94,7 +94,7 @@ pub fn print_next_messages(
 
     let next = get_children(curr_msg)
         .or_else(|| get_sibling_branch(map, curr_msg, current))
-        .or_else(|| get_top_level_siblings(thread, current))
+        .or_else(|| get_top_level_siblings(conversation, current))
         .unwrap_or_default();
 
     if next.is_empty() {
@@ -142,8 +142,8 @@ fn get_sibling_branch(map: &Map, curr_msg: &Value, current: &str) -> Option<Vec<
     None
 }
 
-fn get_top_level_siblings(thread: &Value, current: &str) -> Option<Vec<String>> {
-    let arr = thread["messages"].as_array()?;
+fn get_top_level_siblings(conversation: &Value, current: &str) -> Option<Vec<String>> {
+    let arr = conversation["messages"].as_array()?;
 
     let pos = arr.iter().position(|v| v.as_str() == Some(current))?;
     let v = arr.iter()

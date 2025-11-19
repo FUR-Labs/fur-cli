@@ -9,7 +9,7 @@ use crate::commands::jot::JotArgs;
 pub struct FurContext {
     pub fur_dir: PathBuf,
     pub avatars: Value,
-    pub thread_id: String,
+    pub conversation_id: String,
 }
 
 pub fn load_context() -> Result<FurContext, String> {
@@ -22,7 +22,7 @@ pub fn load_context() -> Result<FurContext, String> {
     let avatars = load_avatars();
     let index = read_json(&fur_dir.join("index.json"));
 
-    let thread_id = index["active_thread"]
+    let conversation_id = index["active_thread"]
         .as_str()
         .unwrap_or("main")
         .to_string();
@@ -30,7 +30,7 @@ pub fn load_context() -> Result<FurContext, String> {
     Ok(FurContext {
         fur_dir: fur_dir.to_path_buf(),
         avatars,
-        thread_id,
+        conversation_id,
     })
 }
 
@@ -81,24 +81,24 @@ pub fn save_message(fur_dir: &Path, msg_id: &str, msg: &Value) {
     write_json(&path, msg);
 }
 
-pub fn update_thread(ctx: &FurContext, msg_id: &str, parent: Option<&str>) {
+pub fn update_conversation(ctx: &FurContext, msg_id: &str, parent: Option<&str>) {
     if let Some(pid) = parent {
         attach_to_parent(&ctx.fur_dir, pid, msg_id);
         return;
     }
 
-    let thread_path = ctx
+    let conversation_path = ctx
         .fur_dir
         .join("threads")
-        .join(format!("{}.json", ctx.thread_id));
+        .join(format!("{}.json", ctx.conversation_id));
 
-    let mut thread = read_json(&thread_path);
+    let mut conversation = read_json(&conversation_path);
 
-    if let Some(arr) = thread["messages"].as_array_mut() {
+    if let Some(arr) = conversation["messages"].as_array_mut() {
         arr.push(json!(msg_id));
     }
 
-    write_json(&thread_path, &thread);
+    write_json(&conversation_path, &conversation);
 }
 
 fn attach_to_parent(fur_dir: &Path, parent_id: &str, message_id: &str) {
@@ -127,13 +127,13 @@ pub fn update_index(fur_dir: &Path, msg_id: &str) {
     write_json(&index_path, &index);
 }
 
-pub fn print_confirmation(avatars: &Value, avatar_name: &str, msg_id: &str, thread_id: &str) {
+pub fn print_confirmation(avatars: &Value, avatar_name: &str, msg_id: &str, conversation_id: &str) {
     let (_, emoji) = resolve_avatar(avatars, avatar_name);
 
     println!(
         "✍️ Message jotted down: [{}] {} [{}] {}",
         &msg_id[..8],
-        thread_id,
+        conversation_id,
         avatar_name,
         emoji
     );

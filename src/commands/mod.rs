@@ -6,7 +6,7 @@ pub mod timeline;
 pub mod printed;
 pub mod fork;
 pub mod status;
-pub mod thread;
+pub mod conversation;
 pub mod jump;
 pub mod tree;
 pub mod save;

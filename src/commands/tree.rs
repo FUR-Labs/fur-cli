@@ -9,7 +9,7 @@ use colored::*;
 #[derive(Parser, Clone)]
 pub struct TreeArgs {
     #[clap(skip)]
-    pub thread_override: Option<String>,
+    pub conversation_override: Option<String>,
 }
 
 pub fn run_tree(args: TreeArgs) {
@@ -21,19 +21,19 @@ pub fn run_tree(args: TreeArgs) {
         return;
     }
 
-    // Load index and thread
+    // Load index and conversation
     let index_data: Value =
         serde_json::from_str(&fs::read_to_string(&index_path).expect("❌ Cannot read index.json"))
             .unwrap();
 
-    let thread_id = if let Some(ref override_id) = args.thread_override {
+    let conversation_id = if let Some(ref override_id) = args.conversation_override {
         override_id
     } else {
         index_data["active_thread"].as_str().unwrap_or("")
     };
-    let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    let thread_data: Value =
-        serde_json::from_str(&fs::read_to_string(&thread_path).expect("❌ Cannot read thread"))
+    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let conversation_data: Value =
+        serde_json::from_str(&fs::read_to_string(&conversation_path).expect("❌ Cannot read conversation"))
             .unwrap();
 
     // Load avatars.json once
@@ -43,12 +43,12 @@ pub fn run_tree(args: TreeArgs) {
 
     println!(
         "{} {}",
-        "🌳 Thread Tree:".bold().cyan(),
-        thread_data["title"].as_str().unwrap_or("Untitled").green().bold()
+        "🌳 Conversation Tree:".bold().cyan(),
+        conversation_data["title"].as_str().unwrap_or("Untitled").green().bold()
     );
 
-    if let Some(messages) = thread_data["messages"].as_array() {
-        let id_to_message = build_id_to_message(&fur_dir, &thread_data);
+    if let Some(messages) = conversation_data["messages"].as_array() {
+        let id_to_message = load_conversation_messages(&fur_dir, &conversation_data);
         for (idx, msg_id) in messages.iter().enumerate() {
             if let Some(mid) = msg_id.as_str() {
                 render_message(&id_to_message, mid, "", idx == messages.len() - 1, &avatars);
@@ -57,10 +57,9 @@ pub fn run_tree(args: TreeArgs) {
     }
 }
 
-/// Preload all messages into a HashMap
-fn build_id_to_message(fur_dir: &Path, thread: &Value) -> HashMap<String, Value> {
+fn load_conversation_messages(fur_dir: &Path, conversation: &Value) -> HashMap<String, Value> {
     let mut id_to_message = HashMap::new();
-    let mut to_visit: Vec<String> = thread["messages"]
+    let mut to_visit: Vec<String> = conversation["messages"]
         .as_array()
         .unwrap_or(&vec![])
         .iter()
@@ -97,7 +96,7 @@ fn build_id_to_message(fur_dir: &Path, thread: &Value) -> HashMap<String, Value>
     id_to_message
 }
 
-/// Recursive tree renderer
+
 fn render_message(
     id_to_message: &HashMap<String, Value>,
     msg_id: &str,

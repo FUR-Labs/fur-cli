@@ -72,7 +72,7 @@ pub fn apply_jot_effects(
     avatar: &str
 ) {
     save_message(&ctx.fur_dir, msg_id, msg);
-    update_thread(ctx, msg_id, parent);
+    update_conversation(ctx, msg_id, parent);
     update_index(&ctx.fur_dir, msg_id);
-    print_confirmation(&ctx.avatars, avatar, msg_id, &ctx.thread_id);
+    print_confirmation(&ctx.avatars, avatar, msg_id, &ctx.conversation_id);
 }

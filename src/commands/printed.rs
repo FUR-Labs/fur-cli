@@ -4,7 +4,7 @@ use serde_json::Value;
 use colored::*;
 use crate::commands::timeline::{run_timeline, TimelineArgs};
 
-/// `fur printed` — exports the active thread to Markdown or PDF
+/// `fur printed` — exports the active conversation to Markdown or PDF
 pub fn run_printed(out: Option<String>, verbose: bool) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
@@ -14,21 +14,21 @@ pub fn run_printed(out: Option<String>, verbose: bool) {
         return;
     }
 
-    // --- Load index and get active thread ID ---
+    // --- Load index and get active conversation ID ---
     let index: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
     let active_id = index["active_thread"].as_str().unwrap_or_default();
     if active_id.is_empty() {
-        eprintln!("❌ No active thread found.");
+        eprintln!("❌ No active conversation found.");
         return;
     }
 
-    // --- Load active thread metadata ---
-    let thread_path = fur_dir.join("threads").join(format!("{}.json", active_id));
-    let thread_json: Value =
-        serde_json::from_str(&fs::read_to_string(&thread_path).unwrap()).unwrap();
+    // --- Load active conversation metadata ---
+    let conversation_path = fur_dir.join("threads").join(format!("{}.json", active_id));
+    let conversation_json: Value =
+        serde_json::from_str(&fs::read_to_string(&conversation_path).unwrap()).unwrap();
 
-    let title = thread_json["title"].as_str().unwrap_or("untitled");
-    let id = thread_json["id"].as_str().unwrap_or("unknown");
+    let title = conversation_json["title"].as_str().unwrap_or("untitled");
+    let id = conversation_json["id"].as_str().unwrap_or("unknown");
 
     // --- Determine output file path ---
     let out_path = match out {
@@ -54,14 +54,14 @@ pub fn run_printed(out: Option<String>, verbose: bool) {
         verbose,
         contents: true,
         out: Some(out_path.clone()),
-        thread_override: None,
+        conversation_override: None,
     };
 
     // --- Logging ---
     println!(
         "{}",
         format!(
-            "🖨️  Printing thread: {} ({}) → {}",
+            "🖨️  Printing conversation: {} ({}) → {}",
             title, id, out_path
         )
         .bright_green()

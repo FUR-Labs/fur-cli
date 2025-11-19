@@ -18,7 +18,7 @@
 
 ## 🤔 What is FUR?
 
-FUR is a lightweight tool that helps you **organize your AI chats into diaries** — each diary containing multiple conversations you can revisit, navigate, and export.
+FUR is a lightweight tool that helps you **organize your AI chats into diaries**, with each diary holding multiple conversations you can revisit, navigate, and export.
 
 Instead of endless scrolling through chat history, FUR gives you:
 
@@ -74,8 +74,8 @@ FUR works perfectly without it.
 FUR stores everything inside a small local folder:
 
 * `.fur/index.json` → list of conversations  
-* `.fur/threads/*.json` → one file per diary  
-* `.fur/messages/*.json` → messages inside each diary  
+* `.fur/threads/*.json` → one file per conversation diary  
+* `.fur/messages/*.json` → messages inside each conversation diary  
 * `.fur/avatars.json` → your persona mapping  
 
 Everything is **human-readable**, portable, and version-safe.
@@ -99,8 +99,8 @@ fur jot "These notes are tied to what I learned in DSA" --file notes/DSA.md
 
 # See all conversations in your diary (.fur project)
 fur convo
-# Switch to another conversation (alias 'thread')
-fur convo <thread_id (first unique characters)>
+# Switch to another conversation
+fur convo <conversation_id (first unique characters)>
 
 # Export your currently-tracked conversation to Markdown
 fur printed 
@@ -140,8 +140,9 @@ It's something simpler:
 
 **A place to keep your conversations with clarity.**
 
-Your chats — with AI, with yourself, with collaborators — deserve structure.
-FUR gives them a home.
+Your chats with AI, with yourself, and with collaborators deserve a clear place to live. 
+FUR gives them that home.
+
 
 *Fast.*
 *Local.*

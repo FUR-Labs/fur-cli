@@ -5,7 +5,6 @@ use chrono::{DateTime, FixedOffset, Local};
 
 use crate::frs::avatars::resolve_avatar;
 
-/// Struct holding normalized message info
 #[allow(dead_code)]
 pub struct MessageInfo {
     pub date_str: String,
@@ -22,7 +21,6 @@ pub struct MessageInfo {
 
 
 
-/// Load and normalize a message JSON
 pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<MessageInfo> {
     let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
     let msg_content = fs::read_to_string(&msg_path).ok()?;

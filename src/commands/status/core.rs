@@ -3,30 +3,30 @@ use std::path::Path;
 use serde_json::Value;
 use std::collections::HashMap;
 
-pub fn load_index_and_thread(fur_dir: &Path)
+pub fn load_index_and_conversation(fur_dir: &Path)
     -> (Value, Value, String)
 {
     let index_path = fur_dir.join("index.json");
     let index: Value = read_json(&index_path);
 
-    let thread_id = index["active_thread"].as_str().unwrap_or("");
+    let conversation_id = index["active_thread"].as_str().unwrap_or("");
     let current = index["current_message"].as_str().unwrap_or("").to_string();
 
-    let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    let thread: Value = read_json(&thread_path);
+    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let conversation: Value = read_json(&conversation_path);
 
-    (index, thread, current)
+    (index, conversation, current)
 }
 
 
 /// Preload all reachable messages
-pub fn build_id_to_message(
+pub fn load_conversation_messages(
     fur_dir: &Path,
-    thread: &Value
+    conversation: &Value
 ) -> HashMap<String, Value> {
     let mut id_to_message = HashMap::new();
 
-    let mut stack: Vec<String> = thread["messages"]
+    let mut stack: Vec<String> = conversation["messages"]
         .as_array().unwrap_or(&vec![])
         .iter()
         .filter_map(|id| id.as_str().map(|s| s.to_string()))
@@ -67,9 +67,9 @@ pub fn build_id_to_message(
     id_to_message
 }
 
-/// If current_message missing, use first in thread.messages
-pub fn first_message_fallback(thread: &Value) -> String {
-    thread["messages"]
+/// If current_message missing, use first in conversation.messages
+pub fn first_message_fallback(conversation: &Value) -> String {
+    conversation["messages"]
         .as_array()
         .and_then(|arr| arr.get(0))
         .and_then(|v| v.as_str())

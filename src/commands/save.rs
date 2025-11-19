@@ -11,7 +11,7 @@ pub struct SaveArgs {
     pub out: Option<String>,
 }
 
-/// Save the active thread back into a .frs file
+/// Save the active conversation back into a .frs file
 pub fn run_save(args: SaveArgs) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
@@ -25,20 +25,20 @@ pub fn run_save(args: SaveArgs) {
         serde_json::from_str(&fs::read_to_string(&index_path).expect("❌ Cannot read index.json"))
             .unwrap();
 
-    let thread_id = match index["active_thread"].as_str() {
+    let conversation_id = match index["active_thread"].as_str() {
         Some(id) => id,
         None => {
-            eprintln!("⚠️ No active thread.");
+            eprintln!("⚠️ No active conversation.");
             return;
         }
     };
 
-    let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    let thread: Value =
-        serde_json::from_str(&fs::read_to_string(&thread_path).expect("❌ Cannot read thread"))
+    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let conversation: Value =
+        serde_json::from_str(&fs::read_to_string(&conversation_path).expect("❌ Cannot read conversation"))
             .unwrap();
 
-    let title = thread["title"].as_str().unwrap_or("Untitled");
+    let title = conversation["title"].as_str().unwrap_or("Untitled");
     let safe_title = title.replace(" ", "_");
 
     let output_path = args
@@ -49,7 +49,7 @@ pub fn run_save(args: SaveArgs) {
 
     // ---- header
     out.push_str(&format!("new \"{}\"\n", title));
-    if let Some(tags) = thread["tags"].as_array() {
+    if let Some(tags) = conversation["tags"].as_array() {
         if !tags.is_empty() {
             let tags_str = tags
                 .iter()
@@ -62,14 +62,14 @@ pub fn run_save(args: SaveArgs) {
     }
 
     // ---- messages (recursive)
-    for msg_id in thread["messages"].as_array().unwrap_or(&vec![]) {
+    for msg_id in conversation["messages"].as_array().unwrap_or(&vec![]) {
         if let Some(mid) = msg_id.as_str() {
             out.push_str(&render_message(mid, 0, fur_dir));
         }
     }
 
     fs::write(&output_path, out).expect("❌ Could not write .frs file");
-    println!("💾 Saved thread \"{}\" to {}", title, output_path);
+    println!("💾 Saved conversation \"{}\" to {}", title, output_path);
 }
 
 fn render_message(msg_id: &str, indent: usize, fur_dir: &Path) -> String {

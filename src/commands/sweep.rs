@@ -126,7 +126,7 @@ pub fn run_sweep(args: SweepArgs) {
             total_projects.to_string().bold().bright_yellow(),
             if total_projects == 1 { "project" } else { "projects" },
             total_threads.to_string().bold().green(),
-            if total_threads == 1 { "thread" } else { "threads" },
+            if total_threads == 1 { "conversation" } else { "threads" },
             total_messages.to_string().bold().blue(),
             if total_messages == 1 { "message" } else { "messages" },
         );

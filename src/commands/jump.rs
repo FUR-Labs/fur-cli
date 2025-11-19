@@ -21,14 +21,14 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
     let index_data = fs::read_to_string(index_path).expect("❌ Couldn't read index.json");
     let mut index: Value = serde_json::from_str(&index_data).unwrap();
 
-    let thread_id = index["active_thread"].as_str().unwrap();
-    let thread_path = Path::new(".fur/threads").join(format!("{}.json", thread_id));
-    let thread_data = fs::read_to_string(thread_path).expect("❌ Couldn't read thread file");
-    let thread: Value = serde_json::from_str(&thread_data).unwrap();
+    let conversation_id = index["active_thread"].as_str().unwrap();
+    let conversation_path = Path::new(".fur/threads").join(format!("{}.json", conversation_id));
+    let conversation_data = fs::read_to_string(conversation_path).expect("❌ Couldn't read conversation file");
+    let conversation: Value = serde_json::from_str(&conversation_data).unwrap();
 
     let current_id = index["current_message"].as_str().unwrap_or_default();
 
-    let messages = thread["messages"].as_array().unwrap();
+    let messages = conversation["messages"].as_array().unwrap();
 
     // Locate current message
     let current_msg_id = current_id;
@@ -45,7 +45,7 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
         });
 
     if current_msg.is_none() {
-        eprintln!("❌ Current message not found in thread.");
+        eprintln!("❌ Current message not found in conversation.");
         return Ok(());
     }
     let current = current_msg.unwrap();
@@ -72,15 +72,15 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
 
             match msg_json["parent"].as_str() {
                 Some(pid) if !pid.is_empty() => {
-                    let in_thread = thread["messages"]
+                    let in_conversation = conversation["messages"]
                         .as_array()
                         .unwrap_or(&vec![])
                         .iter()
                         .any(|val| val.as_str() == Some(pid));
 
-                    if !in_thread {
-                        println!("\x1b[91m📜 You've reached the origin of this thread. No earlier messages exist.\x1b[0m");
-                        println!("\x1b[93m🌱 To start a new conversation, run:\n    fur new \"Title of your new thread\"\x1b[0m");
+                    if !in_conversation {
+                        println!("\x1b[91m📜 You've reached the origin of this conversation. No earlier messages exist.\x1b[0m");
+                        println!("\x1b[93m🌱 To start a new conversation, run:\n    fur new \"Title of your new conversation\"\x1b[0m");
                         return Ok(());
                     }
 
@@ -89,8 +89,8 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
                     jumped += 1;
                 }
                 _ => {
-                    println!("\x1b[91m📜 You've reached the origin of this thread. No earlier messages exist.\x1b[0m");
-                    println!("\x1b[93m🌱 To start a new conversation, run:\n    fur new \"Title of your new thread\"\x1b[0m");
+                    println!("\x1b[91m📜 You've reached the origin of this conversation. No earlier messages exist.\x1b[0m");
+                    println!("\x1b[93m🌱 To start a new conversation, run:\n    fur new \"Title of your new conversation\"\x1b[0m");
                     return Ok(());
                 }
             }

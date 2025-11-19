@@ -1,7 +1,6 @@
 use colored::*;
 
-/// Render a section header with rows aligned like a clean log.
-pub fn render_list(title: &str, headers: &[&str], rows: Vec<Vec<String>>, active_idx: Option<usize>) {
+pub fn render_table(title: &str, headers: &[&str], rows: Vec<Vec<String>>, active_idx: Option<usize>) {
     // Header
     println!("{}", format!("=== {} ===", title).bold().bright_cyan());
     println!("{}", "-".repeat(28));

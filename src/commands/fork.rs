@@ -7,25 +7,25 @@ use chrono::Utc;
 pub fn run_fork_from_active(title: Option<String>) {
     let index_path = Path::new(".fur").join("index.json");
     let index_data: Value = serde_json::from_str(&fs::read_to_string(index_path).unwrap()).unwrap();
-    let active_thread = index_data["active_thread"]
+    let active_conversation = index_data["active_thread"]
         .as_str()
-        .expect("No active thread set");
+        .expect("No active conversation set");
 
-    run_fork(active_thread, title);
+    run_fork(active_conversation, title);
 }
 
-pub fn run_fork(thread_id: &str, title: Option<String>) {
+pub fn run_fork(conversation_id: &str, title: Option<String>) {
     let fur_dir = Path::new(".fur");
     let threads_dir = fur_dir.join("threads");
     let index_path = fur_dir.join("index.json");
 
-    let old_path = threads_dir.join(format!("{}.json", thread_id));
+    let old_path = threads_dir.join(format!("{}.json", conversation_id));
     if !old_path.exists() {
-        eprintln!("❌ Thread ID {} does not exist at path {:?}", thread_id, old_path);
+        eprintln!("❌ Thread ID {} does not exist at path {:?}", conversation_id, old_path);
         return;
     }
 
-    // Read old thread
+    // Read old conversation
     let old_data: Value = serde_json::from_str(
         &fs::read_to_string(&old_path).unwrap()
     ).unwrap();
@@ -45,16 +45,16 @@ pub fn run_fork(thread_id: &str, title: Option<String>) {
 
     let messages = old_data["messages"].clone();
 
-    let new_thread = json!({
+    let new_conversation = json!({
         "id": new_id,
         "title": fork_title,
         "created_at": timestamp,
-        "forked_from": thread_id,
+        "forked_from": conversation_id,
         "messages": messages
     });
 
     let new_path = threads_dir.join(format!("{}.json", new_id));
-    fs::write(&new_path, serde_json::to_string_pretty(&new_thread).unwrap()).unwrap();
+    fs::write(&new_path, serde_json::to_string_pretty(&new_conversation).unwrap()).unwrap();
 
     // Update index.json
     let mut index_data: Value = serde_json::from_str(
@@ -70,12 +70,12 @@ pub fn run_fork(thread_id: &str, title: Option<String>) {
     if used_custom_title {
         println!(
             "🌱 Created fork \"{}\" from {} -- {} → {}",
-            fork_title, old_title, thread_id, new_id
+            fork_title, old_title, conversation_id, new_id
         );
     } else {
         println!(
-            "🌱 Forked thread from {} -- {} → {}",
-            old_title, thread_id, new_id
+            "🌱 Forked conversation from {} -- {} → {}",
+            old_title, conversation_id, new_id
         );
     }
 }

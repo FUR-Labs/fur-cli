@@ -3,9 +3,9 @@ use std::path::Path;
 use serde_json::{Value, json};
 use clap::Parser;
 use chrono::{DateTime, Local, Utc};
-use crate::renderer::list::render_list;
+use crate::renderer::table::render_table;
 
-/// Arguments for the `thread` command
+/// Arguments for the `conversation` command
 #[derive(Parser)]
 pub struct ThreadArgs {
     /// Thread ID or prefix to switch
@@ -16,8 +16,8 @@ pub struct ThreadArgs {
     pub view: bool,
 }
 
-/// Main entry point for the `thread` command
-pub fn run_thread(args: ThreadArgs) {
+/// Main entry point for the `conversation` command
+pub fn run_conversation(args: ThreadArgs) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
 
@@ -40,16 +40,16 @@ pub fn run_thread(args: ThreadArgs) {
         let mut rows = Vec::new();
         let mut active_idx = None;
 
-        // Collect thread metadata first
-        let mut thread_info = Vec::new();
+        // Collect conversation metadata first
+        let mut conversation_info = Vec::new();
         for tid in threads {
             if let Some(tid_str) = tid.as_str() {
-                let thread_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
-                if let Ok(content) = fs::read_to_string(thread_path) {
-                    if let Ok(thread_json) = serde_json::from_str::<Value>(&content) {
-                        let title = thread_json["title"].as_str().unwrap_or("Untitled").to_string();
-                        let created_raw = thread_json["created_at"].as_str().unwrap_or("");
-                        let msg_count = thread_json["messages"]
+                let conversation_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
+                if let Ok(content) = fs::read_to_string(conversation_path) {
+                    if let Ok(conversation_json) = serde_json::from_str::<Value>(&content) {
+                        let title = conversation_json["title"].as_str().unwrap_or("Untitled").to_string();
+                        let created_raw = conversation_json["created_at"].as_str().unwrap_or("");
+                        let msg_count = conversation_json["messages"]
                             .as_array()
                             .map(|a| a.len())
                             .unwrap_or(0);
@@ -62,7 +62,7 @@ pub fn run_thread(args: ThreadArgs) {
                         let date_str = local_time.format("%Y-%m-%d").to_string();
                         let time_str = local_time.format("%H:%M").to_string();
 
-                        thread_info.push((
+                        conversation_info.push((
                             tid_str.to_string(),
                             title,
                             date_str,
@@ -76,10 +76,10 @@ pub fn run_thread(args: ThreadArgs) {
         }
 
         // Sort newest → oldest
-        thread_info.sort_by(|a, b| b.5.cmp(&a.5));
+        conversation_info.sort_by(|a, b| b.5.cmp(&a.5));
 
         // Build rows and track active index
-        for (i, (tid, title, date, time, msg_count, _)) in thread_info.iter().enumerate() {
+        for (i, (tid, title, date, time, msg_count, _)) in conversation_info.iter().enumerate() {
             let short_id = &tid[..8];
             rows.push(vec![
                 short_id.to_string(),
@@ -92,7 +92,7 @@ pub fn run_thread(args: ThreadArgs) {
             }
         }
 
-        render_list("Threads", &["ID", "Title", "Created", "#Msgs"], rows, active_idx);
+        render_table("Threads", &["ID", "Title", "Created", "#Msgs"], rows, active_idx);
         return;
     }
 
@@ -131,11 +131,11 @@ pub fn run_thread(args: ThreadArgs) {
         index["current_message"] = serde_json::Value::Null;
         fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
 
-        let thread_path = fur_dir.join("threads").join(format!("{}.json", tid_full));
-        let content = fs::read_to_string(thread_path).unwrap();
-        let thread_json: Value = serde_json::from_str(&content).unwrap();
-        let title = thread_json["title"].as_str().unwrap_or("Untitled");
+        let conversation_path = fur_dir.join("threads").join(format!("{}.json", tid_full));
+        let content = fs::read_to_string(conversation_path).unwrap();
+        let conversation_json: Value = serde_json::from_str(&content).unwrap();
+        let title = conversation_json["title"].as_str().unwrap_or("Untitled");
 
-        println!("✔️ Switched active thread to {} \"{}\"", &tid_full[..8], title);
+        println!("✔️ Switched active conversation to {} \"{}\"", &tid_full[..8], title);
     }
 }

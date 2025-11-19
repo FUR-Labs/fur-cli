@@ -2,7 +2,7 @@ use crate::frs::avatars::{load_avatars, save_avatars, get_random_emoji_for_name}
 use crate::frs::emojis::{preview_emojis, search_emojis};
 use serde_json::json;
 use colored::*;
-use crate::renderer::list::render_list;
+use crate::renderer::table::render_table;
 use crate::commands::utils::input::{ask_string, ask_raw, ask_yes_no, default_yes};
 
 pub fn run_avatar_view() {
@@ -29,7 +29,7 @@ pub fn run_avatar_view() {
             }
         }
 
-        render_list("Avatars", &["Role", "Emoji"], rows, active_idx);
+        render_table("Avatars", &["Role", "Emoji"], rows, active_idx);
     }
 }
 

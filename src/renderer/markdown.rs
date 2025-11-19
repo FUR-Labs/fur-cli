@@ -5,7 +5,7 @@ use serde_json::Value;
 use crate::commands::timeline::TimelineArgs;
 use crate::renderer::utils::load_message;
 
-pub fn render_message_md(
+pub fn render_message_to_md(
     fur_dir: &Path,
     msg_id: &str,
     label: String,
@@ -50,7 +50,7 @@ pub fn render_message_md(
         let branch_label = format!("{} - Branch {}", label, bi + 1);
 
         for cid in block {
-            render_message_md(fur_dir, cid, branch_label.clone(), args, avatars, out);
+            render_message_to_md(fur_dir, cid, branch_label.clone(), args, avatars, out);
         }
     }
 }

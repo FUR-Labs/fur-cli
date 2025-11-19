@@ -20,14 +20,14 @@ pub fn run_frs(path: &str) {
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .collect();
 
-    let thread = parser::parse_frs(path);
+    let conversation = parser::parse_frs(path);
     let mut stored = false;
 
     for (lineno, line) in lines.iter().enumerate() {
         // --- Commit point
         if line == "store" {
             if !stored {
-                let tid = persist_frs(&thread);
+                let tid = persist_frs(&conversation);
                 println!("✔️ Thread persisted at line {} → {}", lineno + 1, &tid[..8]);
                 stored = true;
             } else {
@@ -43,9 +43,9 @@ pub fn run_frs(path: &str) {
 
         // --- Status
         if line.starts_with("status") {
-            with_ephemeral(stored, &thread, |tid_override| {
+            with_ephemeral(stored, &conversation, |tid_override| {
                 let args = crate::commands::status::StatusArgs {
-                    thread_override: tid_override,
+                    conversation_override: tid_override,
                 };
                 crate::commands::status::run_status(args);
             });
@@ -59,7 +59,7 @@ pub fn run_frs(path: &str) {
                 verbose: false,
                 contents: false,
                 out: None,
-                thread_override: None,
+                conversation_override: None,
             };
             for (i, p) in parts.iter().enumerate() {
                 if *p == "--out" {
@@ -70,9 +70,9 @@ pub fn run_frs(path: &str) {
                 }
             }
 
-            with_ephemeral(stored, &thread, |tid_override| {
+            with_ephemeral(stored, &conversation, |tid_override| {
                 let mut args = args.clone();
-                args.thread_override = tid_override;
+                args.conversation_override = tid_override;
                 timeline::run_timeline(args);
             });
             continue;
@@ -80,10 +80,10 @@ pub fn run_frs(path: &str) {
 
         // --- Tree
         if line.starts_with("tree") {
-            let args = TreeArgs { thread_override: None };
-            with_ephemeral(stored, &thread, |tid_override| {
+            let args = TreeArgs { conversation_override: None };
+            with_ephemeral(stored, &conversation, |tid_override| {
                 let mut args = args.clone();
-                args.thread_override = tid_override;
+                args.conversation_override = tid_override;
                 tree::run_tree(args);
             });
             continue;
@@ -97,13 +97,13 @@ pub fn run_frs(path: &str) {
     }
 }
 
-/// Run a command either with an ephemeral thread (if not stored) or directly.
-fn with_ephemeral<F>(stored: bool, thread: &crate::frs::ast::Thread, mut f: F)
+/// Run a command either with an ephemeral conversation (if not stored) or directly.
+fn with_ephemeral<F>(stored: bool, conversation: &crate::frs::ast::Thread, mut f: F)
 where
     F: FnMut(Option<String>),
 {
     if !stored {
-        let tid = crate::frs::persist::persist_ephemeral(thread);
+        let tid = crate::frs::persist::persist_ephemeral(conversation);
         f(Some(tid.clone()));
         crate::frs::persist::cleanup_ephemeral(&tid);
     } else {

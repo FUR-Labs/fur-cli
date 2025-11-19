@@ -21,7 +21,7 @@ use crate::commands::{
     save::{self, SaveArgs},
     sweep::{self, SweepArgs},
     new,
-    thread,
+    conversation,
     run,
 };
 
@@ -95,8 +95,8 @@ enum Commands {
         view: bool,
     },
 
-    #[command(about = "Management:: See or jump to any of your conversations", visible_alias = "thread")]
-    Convo(thread::ThreadArgs),
+    #[command(about = "Management:: See or jump to any of your conversations", visible_alias = "conversation")]
+    Convo(conversation::ThreadArgs),
     
     #[command(about = "Management:: Tree of full conversation")]
     Tree(TreeArgs),
@@ -143,7 +143,7 @@ enum GitCmd {
 fn dispatch_git(cmd: GitCmd) {
     match cmd {
         GitCmd::Status => {
-            let args = status::StatusArgs { thread_override: None };
+            let args = status::StatusArgs { conversation_override: None };
             status::run_status(args);
             if let Some(repo) = utils::git::find_git_root() {
                 git::status::run_git_status(&repo);
@@ -197,7 +197,7 @@ fn main() {
             }
         }
 
-        Commands::Convo(a) => thread::run_thread(a),
+        Commands::Convo(a) => conversation::run_conversation(a),
         Commands::Tree(a) => tree::run_tree(a),
         Commands::Gsearch(a) => sweep::run_sweep(a),
 

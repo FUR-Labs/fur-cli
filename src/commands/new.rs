@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 use colored::*;
 
-use crate::schema::{make_index_metadata, make_thread_metadata};
+use crate::schema::{make_index_metadata, make_conversation_metadata};
 use crate::frs::avatars::{load_avatars, save_avatars, get_random_emoji_for_name};
 
 fn init_fur_dir(fur_dir: &Path) -> io::Result<()> {
@@ -23,7 +23,7 @@ pub fn onboarding_interactive() -> (String, String) {
     println!("\n{}", "== Main Avatar ==".bright_magenta().bold());
     println!(
         "{}",
-        "This is YOU (or your team). The default voice in this thread.\n\
+        "This is YOU (or your team). The default voice in this conversation.\n\
          Whenever you jot without specifying an avatar, it will be attributed here."
             .bright_cyan()
     );
@@ -120,31 +120,31 @@ fn run_new_internal(
         );
     }
 
-    let thread_id = Uuid::new_v4().to_string();
-    let thread_meta = make_thread_metadata(&name, &thread_id);
+    let conversation_id = Uuid::new_v4().to_string();
+    let conversation_meta = make_conversation_metadata(&name, &conversation_id);
 
-    // --- Write thread ---
-    let thread_path = fur_dir.join("threads").join(format!("{}.json", thread_id));
-    fs::write(&thread_path, serde_json::to_string_pretty(&thread_meta).unwrap())
-        .expect("Could not write thread file");
+    // --- Write conversation ---
+    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    fs::write(&conversation_path, serde_json::to_string_pretty(&conversation_meta).unwrap())
+        .expect("Could not write conversation file");
 
     // --- Update index ---
     let index_path = fur_dir.join("index.json");
     let mut index: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
 
     if let Some(arr) = index["threads"].as_array_mut() {
-        arr.push(json!(thread_id.clone()));
+        arr.push(json!(conversation_id.clone()));
     } else {
-        index["threads"] = json!([thread_id.clone()]);
+        index["threads"] = json!([conversation_id.clone()]);
     }
-    index["active_thread"] = json!(thread_id.clone());
+    index["active_thread"] = json!(conversation_id.clone());
     index["current_message"] = Value::Null;
 
     fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
 
     println!(
         "{}",
-        format!("[NEW] Thread created: {} — \"{}\"", &thread_id[..8], name)
+        format!("[NEW] Thread created: {} — \"{}\"", &conversation_id[..8], name)
             .bright_green()
             .bold()
     );

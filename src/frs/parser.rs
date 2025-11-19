@@ -23,12 +23,12 @@ pub fn parse_frs(path: &str) -> Thread {
         let line = &lines[i];
         if line.starts_with("new ") {
             break extract_quoted(line).unwrap_or_else(|| {
-                panic!("❌ Could not parse thread title from: {}", line)
+                panic!("❌ Could not parse conversation title from: {}", line)
             });
         }
         i += 1;
     };
-    let mut thread = Thread {
+    let mut conversation = Thread {
         title,
         tags: vec![],
         items: vec![],
@@ -71,7 +71,7 @@ pub fn parse_frs(path: &str) -> Thread {
 
         if line.starts_with("tags") {
             if let Some(tags) = parse_tags_line(line) {
-                thread.tags = tags;
+                conversation.tags = tags;
             }
             i += 1;
             continue;
@@ -94,8 +94,8 @@ pub fn parse_frs(path: &str) -> Thread {
     };
 
     // ---- parse content into items
-    thread.items = parse_block(&lines, &mut i, false, &default_user);
-    thread
+    conversation.items = parse_block(&lines, &mut i, false, &default_user);
+    conversation
 }
 
 // ------------------ Helpers ------------------

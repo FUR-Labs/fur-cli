@@ -49,7 +49,7 @@ pub fn run_chat(avatar: Option<String>) {
     fs::write(&path, &buffer).expect("❌ Failed to write file");
     println!("💾 Saved to {}", path.green());
 
-    // --- Reuse jot logic to attach to thread
+    // --- Reuse jot logic to attach to conversation
     let args = JotArgs {
         avatar,
         positional_text: None,
