@@ -31,9 +31,9 @@ pub fn run_tree(args: TreeArgs) {
     } else {
         index_data["active_thread"].as_str().unwrap_or("")
     };
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
     let conversation_data: Value =
-        serde_json::from_str(&fs::read_to_string(&conversation_path).expect("❌ Cannot read conversation"))
+        serde_json::from_str(&fs::read_to_string(&convo_path).expect("❌ Cannot read conversation"))
             .unwrap();
 
     // Load avatars.json once

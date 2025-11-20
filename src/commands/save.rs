@@ -33,9 +33,9 @@ pub fn run_save(args: SaveArgs) {
         }
     };
 
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
     let conversation: Value =
-        serde_json::from_str(&fs::read_to_string(&conversation_path).expect("❌ Cannot read conversation"))
+        serde_json::from_str(&fs::read_to_string(&convo_path).expect("❌ Cannot read conversation"))
             .unwrap();
 
     let title = conversation["title"].as_str().unwrap_or("Untitled");

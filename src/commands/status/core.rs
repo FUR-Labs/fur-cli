@@ -12,8 +12,8 @@ pub fn load_index_and_conversation(fur_dir: &Path)
     let conversation_id = index["active_thread"].as_str().unwrap_or("");
     let current = index["current_message"].as_str().unwrap_or("").to_string();
 
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    let conversation: Value = read_json(&conversation_path);
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let conversation: Value = read_json(&convo_path);
 
     (index, conversation, current)
 }

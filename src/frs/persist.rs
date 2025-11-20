@@ -84,8 +84,8 @@ pub fn persist_frs(conversation: &Thread) -> String {
         "messages": root_ids, // only roots here
     });
 
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    fs::write(&conversation_path, serde_json::to_string_pretty(&conversation_json).unwrap())
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_json).unwrap())
         .expect("❌ Could not write conversation file");
 
     // Update index.json
@@ -129,8 +129,8 @@ pub fn persist_ephemeral(conversation: &Thread) -> String {
         "messages": root_ids,
     });
 
-    let conversation_path = fur_dir.join(format!("{}.json", conversation_id));
-    fs::write(&conversation_path, serde_json::to_string_pretty(&conversation_json).unwrap())
+    let convo_path = fur_dir.join(format!("{}.json", conversation_id));
+    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_json).unwrap())
         .expect("❌ Could not write ephemeral conversation file");
 
     conversation_id
@@ -139,8 +139,8 @@ pub fn persist_ephemeral(conversation: &Thread) -> String {
 /// Clean up ephemeral conversation + messages
 pub fn cleanup_ephemeral(conversation_id: &str) {
     let fur_dir = Path::new(".fur/tmp");
-    let conversation_path = fur_dir.join(format!("{}.json", conversation_id));
-    let _ = fs::remove_file(conversation_path);
+    let convo_path = fur_dir.join(format!("{}.json", conversation_id));
+    let _ = fs::remove_file(convo_path);
     // NOTE: if we want to also clean messages, we can follow `delete_message_recursive`.
 }
 
@@ -149,9 +149,9 @@ pub fn cleanup_ephemeral(conversation_id: &str) {
 /// Delete an old conversation and all its message files.
 fn delete_old_conversation(conversation_id: &str) {
     let fur_dir = Path::new(".fur");
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
 
-    if let Ok(content) = fs::read_to_string(&conversation_path) {
+    if let Ok(content) = fs::read_to_string(&convo_path) {
         if let Ok(conversation_json) = serde_json::from_str::<Value>(&content) {
             if let Some(msgs) = conversation_json["messages"].as_array() {
                 for m in msgs {
@@ -163,7 +163,7 @@ fn delete_old_conversation(conversation_id: &str) {
         }
     }
 
-    let _ = fs::remove_file(conversation_path);
+    let _ = fs::remove_file(convo_path);
 }
 
 /// Recursively delete a message and its children/branches.

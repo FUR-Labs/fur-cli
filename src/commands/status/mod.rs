@@ -38,8 +38,8 @@ pub fn run_status(args: StatusArgs) {
         load_index_and_conversation(&fur_dir);
 
     if let Some(ref tid) = args.conversation_override {
-        let conversation_path = fur_dir.join("tmp").join(format!("{}.json", tid));
-        if let Ok(content) = fs::read_to_string(&conversation_path) {
+        let convo_path = fur_dir.join("tmp").join(format!("{}.json", tid));
+        if let Ok(content) = fs::read_to_string(&convo_path) {
             if let Ok(tmp_conversation) = serde_json::from_str::<Value>(&content) {
                 conversation = tmp_conversation;
             }

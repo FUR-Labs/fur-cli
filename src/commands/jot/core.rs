@@ -87,18 +87,18 @@ pub fn update_conversation(ctx: &FurContext, msg_id: &str, parent: Option<&str>)
         return;
     }
 
-    let conversation_path = ctx
+    let convo_path = ctx
         .fur_dir
         .join("threads")
         .join(format!("{}.json", ctx.conversation_id));
 
-    let mut conversation = read_json(&conversation_path);
+    let mut conversation = read_json(&convo_path);
 
     if let Some(arr) = conversation["messages"].as_array_mut() {
         arr.push(json!(msg_id));
     }
 
-    write_json(&conversation_path, &conversation);
+    write_json(&convo_path, &conversation);
 }
 
 fn attach_to_parent(fur_dir: &Path, parent_id: &str, message_id: &str) {

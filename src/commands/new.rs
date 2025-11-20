@@ -124,8 +124,8 @@ fn run_new_internal(
     let conversation_meta = make_conversation_metadata(&name, &conversation_id);
 
     // --- Write conversation ---
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    fs::write(&conversation_path, serde_json::to_string_pretty(&conversation_meta).unwrap())
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_meta).unwrap())
         .expect("Could not write conversation file");
 
     // --- Update index ---

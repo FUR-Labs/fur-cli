@@ -22,8 +22,8 @@ pub fn run_jump(args: JumpArgs) -> Result<(), Box<dyn std::error::Error>> {
     let mut index: Value = serde_json::from_str(&index_data).unwrap();
 
     let conversation_id = index["active_thread"].as_str().unwrap();
-    let conversation_path = Path::new(".fur/threads").join(format!("{}.json", conversation_id));
-    let conversation_data = fs::read_to_string(conversation_path).expect("❌ Couldn't read conversation file");
+    let convo_path = Path::new(".fur/threads").join(format!("{}.json", conversation_id));
+    let conversation_data = fs::read_to_string(convo_path).expect("❌ Couldn't read conversation file");
     let conversation: Value = serde_json::from_str(&conversation_data).unwrap();
 
     let current_id = index["current_message"].as_str().unwrap_or_default();

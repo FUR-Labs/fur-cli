@@ -42,8 +42,8 @@ pub fn run_timeline(args: TimelineArgs) {
         index["active_thread"].as_str().unwrap_or("")
     };
 
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    let conversation_json: Value = serde_json::from_str(&fs::read_to_string(&conversation_path).unwrap()).unwrap();
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let conversation_json: Value = serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
     let conversation_title = conversation_json["title"].as_str().unwrap_or("Untitled");
 

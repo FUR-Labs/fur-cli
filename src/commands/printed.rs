@@ -23,9 +23,9 @@ pub fn run_printed(out: Option<String>, verbose: bool) {
     }
 
     // --- Load active conversation metadata ---
-    let conversation_path = fur_dir.join("threads").join(format!("{}.json", active_id));
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", active_id));
     let conversation_json: Value =
-        serde_json::from_str(&fs::read_to_string(&conversation_path).unwrap()).unwrap();
+        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
     let title = conversation_json["title"].as_str().unwrap_or("untitled");
     let id = conversation_json["id"].as_str().unwrap_or("unknown");
