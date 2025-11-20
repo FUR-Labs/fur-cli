@@ -6,14 +6,19 @@ use crate::frs::avatars::resolve_avatar;
 type Map = HashMap<String, Value>;
 
 /// Print active conversation title
-pub fn print_active_conversation(index: &Value) {
+pub fn print_active_conversation(index: &Value, conversation: &Value) {
+    let fallback_title = conversation["title"]
+        .as_str()
+        .unwrap_or("Untitled");
+
+    let title = index["title"]
+        .as_str()
+        .unwrap_or(fallback_title);
+
     println!(
         "{} {} {}",
         "Active conversation:".bright_cyan().bold(),
-        index["title"]
-            .as_str()
-            .unwrap_or("Untitled")
-            .bright_green().bold(),
+        title.bright_green().bold(),
         format!("({})", index["active_thread"].as_str().unwrap_or("?"))
             .bright_black()
     );

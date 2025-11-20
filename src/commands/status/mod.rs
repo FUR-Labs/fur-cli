@@ -70,7 +70,7 @@ fn render_status_ui(
     avatars: &Value
 ) {
     // Active conversation
-    print_active_conversation(index);
+    print_active_conversation(index, conversation);
 
     // Current message
     print_current_message(current_msg_id);
