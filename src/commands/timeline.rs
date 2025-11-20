@@ -75,7 +75,18 @@ pub fn run_timeline(args: TimelineArgs) {
             }
         }
 
-        fs::write(path, out_content).expect("❌ Failed writing Markdown file");
+        let word_count = out_content.split_whitespace().count();
+        let token_est = word_count * 4 / 3;
+
+        let mut final_output = String::new();
+        final_output.push_str(&format!(
+            "> ✍️ Words: {}\n> 🪙 Tokens (est.): {}\n\n",
+            word_count, token_est
+        ));
+        final_output.push_str(&out_content);
+
+        fs::write(path, final_output).expect("❌ Failed writing Markdown file");
+
         println!("✔️ Timeline exported to {}", path);
         return;
     }
