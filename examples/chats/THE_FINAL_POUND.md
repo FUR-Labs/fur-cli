@@ -10,8 +10,8 @@
 $$
 \mathcal{P}_{\Omega} =
    \int_{-\infty}^{\infty}
-   e^{i \cdot \zøth^{3}}
-   \cdot \left( \Xi_{\skrøll} + \varphi_{glørz} \right)^{\Delta} \, d\tau
+   e^{i \cdot zøth^{3}}
+   \cdot \left( \Xi_{skrøll} + \varphi_{glørz} \right)^{\Delta} \, d\tau
 $$
 
 ---

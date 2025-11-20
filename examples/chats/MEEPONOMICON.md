@@ -6,22 +6,22 @@
 
 ## ⧉ Skraenntlls’s Ek’kwatiøns ⧉
 
-$$
-\lim_{\zøth \to \infty} 
+$
+\lim_{zøth \to \infty} 
 \oint_{\partial \mathbb{Dräkk}} 
-   \frac{\Xi^{\Omega}}{\Delta_{\skrøll}^{2}} \,
-   e^{i \, \zøth^{3} \theta} \, d\theta 
+   \frac{\Xi^{\Omega}}{\Delta_{skrøll}^{2}} \,
+   e^{i \, zøth^{3} \theta} \, d\theta 
    \;\;\;\Rightarrow\;\;\; \aleph_{pñgu}
-$$
+$
 
 ---
 
 ## Drømm of Skvåk
 
 $$
-\nabla_{\blümm} \cdot \vec{\Psi}_{trǫkk} =
+\nabla_{blümm} \cdot \vec{\Psi}_{trǫkk} =
   \frac{\partial}{\partial \tau}
-  \left( \Lambda_{\infty}^{zøth} \;\otimes\; \omega_{\skrøgg}^{-1} \right)
+  \left( \Lambda_{\infty}^{zøth} \;\otimes\; \omega_{skrøgg}^{-1} \right)
 $$
 
 *annotatiønn frãgmnt:* "cøllapzz ov synmmetrii fjǫrrðrr"  
