@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use serde_json::{Value, json};
 use clap::Parser;
 use chrono::{DateTime, Local, Utc};
@@ -40,6 +40,8 @@ pub fn run_conversation(args: ThreadArgs) {
         let mut rows = Vec::new();
         let mut active_idx = None;
 
+        let mut total_size_bytes: u64 = 0;
+
         // Collect conversation metadata first
         let mut conversation_info = Vec::new();
         for tid in threads {
@@ -56,7 +58,11 @@ pub fn run_conversation(args: ThreadArgs) {
                             conversation_json["created_at"].as_str().unwrap_or("");
                         let msg_ids = conversation_json["messages"]
                             .as_array()
-                            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>())
+                            .map(|a| {
+                                a.iter()
+                                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                    .collect::<Vec<_>>()
+                            })
                             .unwrap_or_default();
 
                         let msg_count = msg_ids.len();
@@ -72,9 +78,12 @@ pub fn run_conversation(args: ThreadArgs) {
                         let time_str = local_time.format("%H:%M").to_string();
 
                         // Compute total footprint (JSON + markdown attachments)
-                        let size_bytes = compute_conversation_size(fur_dir, tid_str, &msg_ids);
-                        let size_mb =
-                            (size_bytes as f64 / (1024.0 * 1024.0)).min(9999.0);
+                        let size_bytes = 
+                            compute_conversation_size(fur_dir, tid_str, &msg_ids);
+
+                        total_size_bytes += size_bytes;
+
+                        let size_str = format_size(size_bytes);
 
                         conversation_info.push((
                             tid_str.to_string(),
@@ -83,7 +92,7 @@ pub fn run_conversation(args: ThreadArgs) {
                             time_str,
                             msg_count,
                             parsed_time,
-                            size_mb,
+                            size_str,
                         ));
                     }
                 }
@@ -94,7 +103,7 @@ pub fn run_conversation(args: ThreadArgs) {
         conversation_info.sort_by(|a, b| b.5.cmp(&a.5));
 
         // Build rows and track active index
-        for (i, (tid, title, date, time, msg_count, _, size_mb)) in
+        for (i, (tid, title, date, time, msg_count, _, size_str)) in
             conversation_info.iter().enumerate()
         {
             let short_id = &tid[..8];
@@ -104,7 +113,7 @@ pub fn run_conversation(args: ThreadArgs) {
                 title.to_string(),
                 format!("{} | {}", date, time),
                 msg_count.to_string(),
-                format!("{:.2} MB", size_mb),
+                size_str.to_string(),
             ]);
 
             if tid == active {
@@ -118,6 +127,10 @@ pub fn run_conversation(args: ThreadArgs) {
             rows,
             active_idx,
         );
+
+        let total_size_str = format_size(total_size_bytes);
+        println!("----------------------------");
+        println!("Total Memory Used: {}", total_size_str);
 
         return;
     }
@@ -191,7 +204,7 @@ fn compute_conversation_size(
     let convo_path = fur_dir.join("threads").join(format!("{}.json", tid));
     total += file_size(&convo_path);
 
-    // Add all messages JSON
+    // Add all messages + markdowns
     total += get_message_file_sizes(fur_dir, msg_ids);
 
     total
@@ -201,16 +214,25 @@ fn get_message_file_sizes(fur_dir: &Path, msg_ids: &[String]) -> u64 {
     let mut total = 0;
 
     for mid in msg_ids {
-        // message JSON
         let msg_path = fur_dir.join("messages").join(format!("{}.json", mid));
         total += file_size(&msg_path);
 
-        // check for markdown pointer inside JSON
+        // Parse JSON to find ONLY message["markdown"]
         if let Ok(content) = fs::read_to_string(&msg_path) {
             if let Ok(json) = serde_json::from_str::<Value>(&content) {
-                if let Some(markdown_rel) = json["markdown"].as_str() {
-                    let md_path = fur_dir.join(markdown_rel);
-                    total += file_size(&md_path);
+
+                if let Some(md_raw) = json["markdown"].as_str() {
+
+                    // CASE 1: absolute path -> use as-is
+                    let md_path = Path::new(md_raw);
+                    if md_path.is_absolute() {
+                        total += file_size(md_path);
+                        continue;
+                    }
+
+                    // CASE 2: relative path -> resolve relative to project root
+                    let project_root_path = Path::new(".").join(md_raw);
+                    total += file_size(&project_root_path);
                 }
             }
         }
@@ -219,6 +241,14 @@ fn get_message_file_sizes(fur_dir: &Path, msg_ids: &[String]) -> u64 {
     total
 }
 
-fn file_size(path: &PathBuf) -> u64 {
+fn file_size(path: &Path) -> u64 {
     fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}
+
+pub fn format_size(bytes: u64) -> String {
+    if bytes < 1_048_576 {
+        format!("{} KB", (bytes as f64 / 1024.0).round() as u64)
+    } else {
+        format!("{:.2} MB", bytes as f64 / (1024.0 * 1024.0))
+    }
 }
