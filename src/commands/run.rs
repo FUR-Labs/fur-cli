@@ -78,6 +78,48 @@ pub fn run_frs(path: &str) {
             continue;
         }
 
+        // --- Printed
+        if line.starts_with("printed") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let mut out: Option<String> = None;
+            let mut verbose = false;
+
+            for (i, p) in parts.iter().enumerate() {
+                if *p == "--out" {
+                    out = parts.get(i + 1).map(|s| s.to_string());
+                }
+                if *p == "--verbose" || *p == "-v" {
+                    verbose = true;
+                }
+            }
+
+            with_ephemeral(stored, &conversation, |tid_override| {
+                // Load index.json so we can temporarily override active thread
+                let index_path = std::path::Path::new(".fur").join("index.json");
+                let mut index_json: serde_json::Value =
+                    serde_json::from_str(&std::fs::read_to_string(&index_path).unwrap()).unwrap();
+
+                let original_active = index_json["active_thread"].as_str().map(|s| s.to_string());
+
+                if let Some(tid) = &tid_override {
+                    index_json["active_thread"] = tid.clone().into();
+                    std::fs::write(&index_path, serde_json::to_string_pretty(&index_json).unwrap()).unwrap();
+                }
+
+                // Now run printed, which will read this modified active_thread
+                crate::commands::printed::run_printed(out.clone(), verbose);
+
+                // Restore original active_thread
+                if let Some(orig) = original_active {
+                    index_json["active_thread"] = orig.into();
+                    std::fs::write(&index_path, serde_json::to_string_pretty(&index_json).unwrap()).unwrap();
+                }
+            });
+
+            continue;
+        }
+
+
         // --- Tree
         if line.starts_with("tree") {
             let args = TreeArgs { conversation_override: None };
