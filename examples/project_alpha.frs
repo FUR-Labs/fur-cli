@@ -3,7 +3,6 @@ new "Project Alpha"
 user = blorbo
 tags = ["work", "project"]
 
-# Blorbo's project to build igloo house / harem
 jot "narrated:: asked to define scope and objectives"
 jot gemini "Scope: Build a large, multi-chambered igloo."
 jot "Set milestones in < 14 tokens, comma-sep"
