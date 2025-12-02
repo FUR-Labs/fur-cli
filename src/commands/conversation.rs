@@ -14,9 +14,12 @@ pub struct ThreadArgs {
     /// View all threads
     #[arg(long)]
     pub view: bool,
+
+    /// Rename
+    #[arg(long, alias = "rn")]
+    pub rename: Option<String>,
 }
 
-/// Main entry point for the `conversation` command
 pub fn run_conversation(args: ThreadArgs) {
     let fur_dir = Path::new(".fur");
     let index_path = fur_dir.join("index.json");
@@ -29,166 +32,228 @@ pub fn run_conversation(args: ThreadArgs) {
     let mut index: Value =
         serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
 
-    // ------------------------
-    // VIEW ALL THREADS
-    // ------------------------
+    if args.rename.is_some() {
+        return handle_rename_thread(&mut index, fur_dir, &args);
+    }
+
     if args.view || args.id.is_none() {
-        let empty_vec: Vec<Value> = Vec::new();
-        let threads = index["threads"].as_array().unwrap_or(&empty_vec);
-        let active = index["active_thread"].as_str().unwrap_or("");
+        return handle_view_threads(&index, fur_dir, &args);
+    }
 
-        let mut rows = Vec::new();
-        let mut active_idx = None;
+    if args.id.is_some() {
+        return handle_switch_thread(&mut index, &index_path, fur_dir, &args);
+    }
+}
 
-        let mut total_size_bytes: u64 = 0;
+fn handle_rename_thread(
+    index: &mut Value,
+    fur_dir: &Path,
+    args: &ThreadArgs,
+) {
+    let new_title = match &args.rename {
+        Some(t) => t,
+        None => return,
+    };
 
-        // Collect conversation metadata first
-        let mut conversation_info = Vec::new();
-        for tid in threads {
-            if let Some(tid_str) = tid.as_str() {
-                let convo_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
-                if let Ok(content) = fs::read_to_string(&convo_path) {
-                    if let Ok(conversation_json) = serde_json::from_str::<Value>(&content) {
-                        let title = conversation_json["title"]
-                            .as_str()
-                            .unwrap_or("Untitled")
-                            .to_string();
+    let empty_vec: Vec<Value> = Vec::new();
+    let threads: Vec<String> = index["threads"]
+        .as_array()
+        .unwrap_or(&empty_vec)
+        .iter()
+        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+        .collect();
 
-                        let created_raw =
-                            conversation_json["created_at"].as_str().unwrap_or("");
-                        let msg_ids = conversation_json["messages"]
-                            .as_array()
-                            .map(|a| {
-                                a.iter()
-                                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                    .collect::<Vec<_>>()
-                            })
-                            .unwrap_or_default();
+    // CASE 1: rename current thread
+    let target_thread_id = if args.id.is_none() {
+        index["active_thread"].as_str().unwrap_or("").to_string()
+    } else {
+        // CASE 2: rename by prefix
+        let prefix = args.id.as_ref().unwrap();
+        let found = threads
+            .iter()
+            .filter(|tid| tid.starts_with(prefix))
+            .collect::<Vec<_>>();
 
-                        let msg_count = msg_ids.len();
-
-                        // Parse created_at safely
-                        let parsed_time =
-                            DateTime::parse_from_rfc3339(created_raw)
-                                .map(|dt| dt.with_timezone(&Utc))
-                                .unwrap_or_else(|_| Utc::now());
-                        let local_time: DateTime<Local> =
-                            DateTime::from(parsed_time);
-                        let date_str = local_time.format("%Y-%m-%d").to_string();
-                        let time_str = local_time.format("%H:%M").to_string();
-
-                        // Compute total footprint (JSON + markdown attachments)
-                        let size_bytes = 
-                            compute_conversation_size(fur_dir, tid_str, &msg_ids);
-
-                        total_size_bytes += size_bytes;
-
-                        let size_str = format_size(size_bytes);
-
-                        conversation_info.push((
-                            tid_str.to_string(),
-                            title,
-                            date_str,
-                            time_str,
-                            msg_count,
-                            parsed_time,
-                            size_str,
-                        ));
-                    }
-                }
-            }
+        if found.is_empty() {
+            eprintln!("❌ No conversation matches prefix '{}'", prefix);
+            return;
+        }
+        if found.len() > 1 {
+            eprintln!("❌ Ambiguous prefix '{}'. Matches: {:?}", prefix, found);
+            return;
         }
 
-        // Sort newest → oldest
-        conversation_info.sort_by(|a, b| b.5.cmp(&a.5));
+        found[0].to_string()
+    };
 
-        // Build rows and track active index
-        for (i, (tid, title, date, time, msg_count, _, size_str)) in
-            conversation_info.iter().enumerate()
-        {
-            let short_id = &tid[..8];
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", target_thread_id));
+    let mut conversation_json: Value =
+        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
-            rows.push(vec![
-                short_id.to_string(),
-                title.to_string(),
-                format!("{} | {}", date, time),
-                msg_count.to_string(),
-                size_str.to_string(),
-            ]);
+    let old_title = conversation_json["title"].as_str().unwrap_or("Untitled").to_string();
 
-            if tid == active {
-                active_idx = Some(i);
-            }
-        }
+    // Update title
+    conversation_json["title"] = Value::String(new_title.to_string());
+    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_json).unwrap()).unwrap();
 
-        render_table(
-            "Threads",
-            &["ID", "Title", "Created", "#Msgs", "Size"],
-            rows,
-            active_idx,
-        );
+    println!(
+        "✏️  Renamed conversation {} \"{}\" → \"{}\"",
+        &target_thread_id[..8],
+        old_title,
+        new_title
+    );
+}
 
-        let total_size_str = format_size(total_size_bytes);
-        println!("----------------------------");
-        println!("Total Memory Used: {}", total_size_str);
 
+fn handle_view_threads(
+    index: &Value,
+    fur_dir: &Path,
+    args: &ThreadArgs,
+) {
+    if !(args.view || args.id.is_none()) {
         return;
     }
 
-    // ------------------------
-    // SWITCH ACTIVE THREAD
-    // ------------------------
-    if let Some(tid) = args.id {
-        let empty_vec: Vec<Value> = Vec::new();
-        let threads: Vec<String> = index["threads"]
-            .as_array()
-            .unwrap_or(&empty_vec)
-            .iter()
-            .filter_map(|t| t.as_str().map(|s| s.to_string()))
-            .collect();
+    let empty_vec: Vec<Value> = Vec::new();
+    let threads = index["threads"].as_array().unwrap_or(&empty_vec);
+    let active = index["active_thread"].as_str().unwrap_or("");
 
-        let mut found = threads.iter().find(|&s| s == &tid);
-        if found.is_none() {
-            let matches: Vec<&String> =
-                threads.iter().filter(|s| s.starts_with(&tid)).collect();
-            if matches.len() == 1 {
-                found = Some(matches[0]);
-            } else if matches.len() > 1 {
-                eprintln!("❌ Ambiguous prefix '{}'. Matches: {:?}", tid, matches);
-                return;
+    let mut rows = Vec::new();
+    let mut active_idx = None;
+
+    let mut total_size_bytes: u64 = 0;
+    let mut conversation_info = Vec::new();
+
+    for tid in threads {
+        if let Some(tid_str) = tid.as_str() {
+            let convo_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
+
+            if let Ok(content) = fs::read_to_string(&convo_path) {
+                if let Ok(convo) = serde_json::from_str::<Value>(&content) {
+                    let title = convo["title"].as_str().unwrap_or("Untitled").to_string();
+                    let created_raw = convo["created_at"].as_str().unwrap_or("");
+
+                    let msg_ids = convo["messages"]
+                        .as_array()
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+
+                    let msg_count = msg_ids.len();
+                    let parsed = DateTime::parse_from_rfc3339(created_raw)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .unwrap_or_else(|_| Utc::now());
+
+                    let local: DateTime<Local> = DateTime::from(parsed);
+                    let date_str = local.format("%Y-%m-%d").to_string();
+                    let time_str = local.format("%H:%M").to_string();
+
+                    let size_bytes = compute_conversation_size(fur_dir, tid_str, &msg_ids);
+                    total_size_bytes += size_bytes;
+
+                    conversation_info.push((
+                        tid_str.to_string(),
+                        title,
+                        date_str,
+                        time_str,
+                        msg_count,
+                        parsed,
+                        format_size(size_bytes),
+                    ));
+                }
             }
         }
-
-        let tid_full = match found {
-            Some(s) => s,
-            None => {
-                eprintln!("❌ Thread not found: {}", tid);
-                return;
-            }
-        };
-
-        index["active_thread"] = json!(tid_full);
-        index["current_message"] = serde_json::Value::Null;
-        fs::write(
-            &index_path,
-            serde_json::to_string_pretty(&index).unwrap(),
-        )
-        .unwrap();
-
-        let convo_path =
-            fur_dir.join("threads").join(format!("{}.json", tid_full));
-        let content = fs::read_to_string(convo_path).unwrap();
-        let conversation_json: Value =
-            serde_json::from_str(&content).unwrap();
-        let title =
-            conversation_json["title"].as_str().unwrap_or("Untitled");
-
-        println!(
-            "✔️ Switched active conversation to {} \"{}\"",
-            &tid_full[..8],
-            title
-        );
     }
+
+    // Sort newest first
+    conversation_info.sort_by(|a, b| b.5.cmp(&a.5));
+
+    for (i, (tid, title, date, time, msg_count, _, size_str)) in
+        conversation_info.iter().enumerate()
+    {
+        rows.push(vec![
+            tid[..8].to_string(),
+            title.to_string(),
+            format!("{} | {}", date, time),
+            msg_count.to_string(),
+            size_str.to_string(),
+        ]);
+
+        if tid == active {
+            active_idx = Some(i);
+        }
+    }
+
+    render_table(
+        "Threads",
+        &["ID", "Title", "Created", "#Msgs", "Size"],
+        rows,
+        active_idx,
+    );
+
+    println!("----------------------------");
+    println!("Total Memory Used: {}", format_size(total_size_bytes));
+}
+
+fn handle_switch_thread(
+    index: &mut Value,
+    index_path: &Path,
+    fur_dir: &Path,
+    args: &ThreadArgs,
+) {
+    let tid = match &args.id {
+        Some(id) => id,
+        None => return,
+    };
+
+    let empty_vec: Vec<Value> = Vec::new();
+    let threads: Vec<String> = index["threads"]
+        .as_array()
+        .unwrap_or(&empty_vec)
+        .iter()
+        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+        .collect();
+
+    let mut found = threads.iter().find(|&s| s == tid);
+
+    if found.is_none() {
+        let matches: Vec<&String> =
+            threads.iter().filter(|s| s.starts_with(tid)).collect();
+
+        if matches.len() == 1 {
+            found = Some(matches[0]);
+        } else if matches.len() > 1 {
+            eprintln!("❌ Ambiguous prefix '{}'. Matches: {:?}", tid, matches);
+            return;
+        }
+    }
+
+    let tid_full = match found {
+        Some(s) => s,
+        None => {
+            eprintln!("❌ Thread not found: {}", tid);
+            return;
+        }
+    };
+
+    index["active_thread"] = json!(tid_full);
+    index["current_message"] = serde_json::Value::Null;
+
+    fs::write(index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", tid_full));
+    let content = fs::read_to_string(convo_path).unwrap();
+    let conversation_json: Value = serde_json::from_str(&content).unwrap();
+    let title = conversation_json["title"].as_str().unwrap_or("Untitled");
+
+    println!(
+        "✔️ Switched active conversation to {} \"{}\"",
+        &tid_full[..8],
+        title
+    );
 }
 
 
