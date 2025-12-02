@@ -23,6 +23,7 @@ use crate::commands::{
     new,
     conversation,
     run,
+    message::{self, MsgArgs},
 };
 
 #[derive(Parser)]
@@ -74,6 +75,9 @@ enum Commands {
 
     #[command(about = "Everyday:: Paste a full chat (write long form)")]
     Chat { avatar: Option<String> },
+
+    #[command(about = "Everyday:: Edit or Delete a jotted message")]
+    Msg(MsgArgs),
 
     #[command(about = "Everyday:: Print timeline of full conversation.")]
     Timeline(TimelineArgs),
@@ -187,6 +191,7 @@ fn main() {
         Commands::New { name } => new::run_new(name),
         Commands::Jot(a) => jot::run_jot(a),
         Commands::Chat { avatar } => chat::run_chat(avatar),
+        Commands::Msg(a) => message::run_msg(a),
         Commands::Timeline(a) => timeline::run_timeline(a),
         Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
 
