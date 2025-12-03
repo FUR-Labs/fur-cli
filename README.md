@@ -1,129 +1,63 @@
 <!-- LOGO -->
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c3582cb8-c1cc-41ab-9ed1-f8fbde4d8c21" width="200" alt="fur logo"/>
-
 </p>
-
 
 <h1 align="center">FUR</h1>
 
-
 <p align="center">
-  <strong>Your AI conversation diary, organized and searchable</strong><br/>
-  A simple tool that turns scattered chats into clean, browsable digital diaries.
+  <a href="https://crates.io/crates/fur-cli"><img src="https://img.shields.io/crates/v/fur-cli.svg" /></a>
+  <a href="https://github.com/andrewrgarcia/fur-cli"><img src="https://img.shields.io/github/stars/andrewrgarcia/fur-cli" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/status-stable-green" /></a>
 </p>
 
 <p align="center">
-  <img width="348" height="126" alt="fur_qwerty" src="https://github.com/user-attachments/assets/c5d65ac1-54b5-4357-b419-e1e3763b2a1d" />
+  <strong>Your AI conversation diary — organized, searchable, and local.</strong><br/>
+  Turn scattered chats into clean, structured, browsable digital diaries.
 </p>
+
 
 <p align="center">
-  👉 For a more visual overview, see the <a href="https://furchats.vercel.app/">FURChats portfolio site</a>.
+  For an optional visual walkthrough, see the <a href="https://furchats.vercel.app/">FURChats portfolio site</a>.
 </p>
 
 ---
 
-## 🤔 What is FUR?
+**FUR: AI Conversation Archiving and Retrieval System**
 
-FUR is a lightweight tool that helps you **organize your AI chats into diaries**, with each diary holding multiple conversations you can revisit, navigate, and export.
-
-Instead of endless scrolling through chat history, FUR gives you:
-
-✅ multiple diaries  
-✅ each diary containing its own conversations  
-✅ every conversation cleanly structured  
-✅ easy navigation, timelines, and exports  
-✅ memory you can actually *use* later
-
-Think of it as **your AI companion's journal**, stored locally, under your control.
-
-No cloud.  
-No syncing.  
-No mystery.  
-
-Just clean **conversation tracking**, built for people who think with AI.
+FUR is a command-line system that transforms fragmented AI chats into structured, navigable, and fully searchable local archives.  
+Designed for researchers, developers, and writers who think with AI and need durable memory, clarity, and fast retrieval.
 
 ---
 
-## 🌟 What can FUR do?
+## Why FUR exists
 
-### **Write**
-- **Jot** quick notes  
-- **Chat** long-form messages or paste documents  
-- **Attach Markdown** files  
-- **Save** conversations as portable `.frs` scripts  
-
-### **Organize**
-- Create a new **conversation** (`fur new`)  
-- Assign **avatars/personas**  
-- Jump to any message  
-- View conversations as **timelines** or **trees**  
-- Switch quickly between conversations 
-
-### **Export**
-- Save conversations as **Markdown**  
-- Generate **PDF timelines**  
-- Script entire conversations using `.frs`
-
-### **Optional Git enhancements**  
-If your FUR project lives inside a Git repo, you also get:
-
-- `fur status` showing Git status  
-- passthrough commands (`fur add`, `fur commit`, etc.)
-
-...but Git is **never required**.  
-FUR works perfectly without it.
+AI chats vanish.  
+They get buried, lost, unsearchable, and unrecoverable.  
+FUR turns those conversations into structured knowledge you can return to, reuse, and build on.
 
 ---
 
-## 🛠 How it works
+## Overview
 
-FUR stores everything inside a small local folder:
+FUR stores every AI conversation in a clean local directory.  
+Each project (a diary) contains multiple conversations, and each conversation contains timestamped messages, metadata, trees, timelines, and optional Markdown attachments.
 
-* `.fur/index.json` → list of conversations  
-* `.fur/threads/*.json` → one file per conversation diary  
-* `.fur/messages/*.json` → messages inside each conversation diary  
-* `.fur/avatars.json` → your persona mapping  
+Core capabilities:
 
-Everything is **human-readable**, portable, and version-safe.
-
----
-
-## 📘 Example workflow
-
-```bash
-# Create a new AI conversation
-fur new "My GPT-5 Notes"
-
-# Add quick jot
-fur jot "Deep learning troubleshooting ideas"
-
-# Paste long chats
-fur chat gpt5
-
-# Quick jot with attached document
-fur jot "These notes are tied to what I learned in DSA" --file notes/DSA.md
-
-# See all conversations in your diary (.fur project)
-fur convo
-# Switch to another conversation
-fur convo <conversation_id (first unique characters)>
-
-# Export your currently-tracked conversation to Markdown
-fur printed 
-
-# Global scan for all diaries in your computer (very fast)
-fur gsearch 
-
-# Optional: Git passthrough (if repo exists)
-fur add .
-fur commit -m "Updated conversations"
-fur push
-```
+- Local, transparent JSON storage  
+- Full-project search (`fur search`)  
+- Conversation tagging  
+- Timelines and message trees  
+- Jot mode and chat import  
+- Markdown attachments and export  
+- `.frs` conversation scripting  
+- Fast, portable, offline
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### From crates.io
 
@@ -139,49 +73,166 @@ cargo install --path . --force
 
 ---
 
-## 🐾 Philosophy
+## Project Structure
 
-FUR isn't trying to be an AI client or a chat interface.
+```
+.fur/
+ ├── index.json            # master index
+ ├── avatars.json          # persona aliases
+ ├── threads/              # per-conversation metadata
+ └── messages/             # per-message storage
+```
 
-It's something simpler:
-
-**A place to keep your conversations with clarity.**
-
-Your chats with AI, with yourself, and with collaborators deserve a clear place to live. 
-FUR gives them that home.
-
-
-*Fast.*
-*Local.*
-*Searchable.*
-*Yours.*
+All files are plain JSON or Markdown.
 
 ---
 
-## 🛣 Roadmap to v1.0
+## Core Commands
 
-✅ **Already complete**
+### Create and Write
 
-* Multiple diaries (.fur projects) & conversations
-* Avatars / personas
-* Timelines & trees
-* Jot & chat modes
-* Jump navigation
-* `.frs` scripting
-* Markdown & PDF exports
-* Optional Git passthrough
+| Command                            | Description                              |
+| ---------------------------------- | ---------------------------------------- |
+| `fur new <name>`                   | Create a conversation                    |
+| `fur jot "<text>"`                 | Add a short message                      |
+| `fur jot "<text>" --file notes.md` | Add a message with a Markdown attachment |
+| `fur chat [avatar]`                | Add long-form content                    |
+| `fur msg`                          | Edit or delete a message                 |
 
-🔜 **Planned**
+### Navigate
 
-* Message deletion & editing
-* Diary-level tagging
-* Richer export layouts
-* Search improvements
-* Optional helper for Git ignore rules
+| Command                 | Description                |
+| ----------------------- | -------------------------- |
+| `fur convo`             | List conversations         |
+| `fur convo <id>`        | Switch active conversation |
+| `fur timeline`          | Chronological timeline     |
+| `fur tree`              | Message tree               |
+| `fur jump <message-id>` | Jump to a message          |
+
+### Organize
+
+| Command                                    | Description                 |
+| ------------------------------------------ | --------------------------- |
+| `fur convo --tag research`                 | Add a tag                   |
+| `fur convo --tag "deep learning"`          | Add spaced tag (normalized) |
+| `fur convo --clear-tags`                   | Remove all tags             |
+| `fur search <query>`                       | Full-project search         |
+| `fur search "deep learning, optimization"` | Multi-query search          |
+
+### Export
+
+| Command       | Description                       |
+| ------------- | --------------------------------- |
+| `fur printed` | Export current thread to Markdown |
+| `fur save`    | Export as `.frs` script           |
+| `fur gsearch` | Scan all FUR journals on disk     |
+
+
+---
+
+## Example Workflow
+
+```bash
+# Create a project
+mkdir research && cd research
+fur new "GPT-5 Experiments"
+
+# Add short notes
+fur jot "Symbolic regression tests using KAN"
+
+# Add longer content
+fur chat gpt5
+
+# Attach markdown notes
+fur jot "Derivations" --file derivations.md
+
+# Explore
+fur convo
+fur timeline
+fur tree
+
+# Search the entire archive
+fur search "memory architecture"
+fur search "deep, learning"
+
+# Export
+fur printed
+fur save session.frs
+```
+
+---
+
+## Search System (v1.0)
+
+FUR’s search engine inspects:
+
+* Message text
+* Attached Markdown files
+* All conversations across the diary
+* Flexible multi-query syntax
+* Contextual snippet extraction
+
+Examples:
+
+```bash
+fur search "universal approximator"
+fur search "symbolic regression, metadata"
+fur search "deep, learning"
+```
+
+---
+
+## Tagging System (v1.0)
+
+Tags are stored at the conversation level:
+
+```bash
+fur convo --tag research
+fur convo --tag "neural forecasting"
+fur convo --tag "macro-modeling, metadata-tools"
+fur convo --clear-tags
+```
+
+Normalization:
+
+* lowercase
+* trimmed
+* spaces → hyphens
+
+Example:
+Input: `deep learning`
+Stored as: `deep-learning`
+
+---
+
+## Philosophy
+
+FUR is not a chat client.
+It is a durable memory system for people who think and work with AI as part of their intellectual workflow.
+
+Principles:
+
+* Local ownership
+* Transparent formats
+* Reliability
+* Portability
+* Speed
+* Long-term retrieval
+
+---
+
+## Roadmap
+
+Future enhancements include:
+
+* Advanced editors for message modification
+* Enhanced search output formats
+* New export templates
+* Optional encrypted diaries
 * Cross-platform installers
 
 ---
 
-## 📜 License
+## License
 
-MIT, like almost everything else that's friendly and open-source.
+MIT License
