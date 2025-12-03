@@ -10,6 +10,7 @@ pub mod conversation;
 pub mod jump;
 pub mod tree;
 pub mod save;
+pub mod search;
 pub mod sweep;
 pub mod run;
 pub mod utils;

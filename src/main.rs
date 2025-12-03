@@ -20,6 +20,7 @@ use crate::commands::{
     status,
     tree::{self, TreeArgs},
     save::{self, SaveArgs},
+    search::{self, SearchArgs},
     sweep::{self, SweepArgs},
     new,
     conversation,
@@ -67,6 +68,7 @@ enum Commands {
         args: Vec<String>,
     },
 
+
     // Everyday
     #[command(about = "Everyday:: Start a new conversation (new convo)")]
     New { name: String },
@@ -89,6 +91,9 @@ enum Commands {
         #[arg(short, long)]
         verbose: bool,
     },
+
+    #[command(about = "Everyday:: Search all conversations for text or markdown matches")]
+    Search(SearchArgs),
 
     // Management
     #[command(about = "Management:: See or create new conversation avatars/personas")]
@@ -205,6 +210,7 @@ fn main() {
 
         Commands::Convo(a) => conversation::run_conversation(a),
         Commands::Tree(a) => tree::run_tree(a),
+        Commands::Search(a) => search::run_search(a),
         Commands::Gsearch(a) => sweep::run_sweep(a),
 
         Commands::Run { path } => run::run_frs(&path),
