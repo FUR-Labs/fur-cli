@@ -1,6 +1,6 @@
 [package]
 name = "fur-cli"
-version = "0.4.4"
+version = "1.0.0"
 edition = "2021"
 authors = ["Andrew Garcia"]
 description = "Turn your AI chats into a durable, local-first diary. Save messages, attach notes, organize conversations, and stop losing context every time the model forgets you exist."
@@ -26,6 +26,7 @@ colored = "3.0.0"
 emojis = "0.6"
 walkdir = "2.5.0"
 dirs = "6.0.0"
+regex = "1"
 
 [dev-dependencies]
 assert_cmd = "2"

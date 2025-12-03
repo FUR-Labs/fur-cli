@@ -4,6 +4,7 @@ mod frs;
 mod schema;
 mod utils;
 mod git;
+mod helpers;
 
 use clap::{Parser, Subcommand, CommandFactory};
 use clap_complete::{generate, shells::{Bash, Zsh, Fish}};

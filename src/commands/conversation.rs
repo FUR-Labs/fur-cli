@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 use clap::Parser;
 use chrono::{DateTime, Local, Utc};
 use crate::renderer::table::render_table;
+use crate::helpers::tags::parse_tag_list;
 
 /// Arguments for the `conversation` command
 #[derive(Parser)]
@@ -18,6 +19,17 @@ pub struct ThreadArgs {
     /// Rename
     #[arg(long, alias = "rn")]
     pub rename: Option<String>,
+
+    /// Add tags (comma-separated, supports spaces)
+    #[arg(long)]
+    pub tag: Option<String>,
+
+    #[arg(long)]
+    pub untag: Option<String>,
+
+    /// Clear all tags from conversation
+    #[arg(long)]
+    pub clear_tags: bool,
 }
 
 pub fn run_conversation(args: ThreadArgs) {
@@ -31,6 +43,10 @@ pub fn run_conversation(args: ThreadArgs) {
 
     let mut index: Value =
         serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+
+    if args.tag.is_some() || args.untag.is_some() || args.clear_tags {
+        return handle_tagging(&args, &mut index, fur_dir);
+    }
 
     if args.rename.is_some() {
         return handle_rename_thread(&mut index, fur_dir, &args);
@@ -143,6 +159,7 @@ fn handle_view_threads(
                         .unwrap_or_default();
 
                     let msg_count = msg_ids.len();
+
                     let parsed = DateTime::parse_from_rfc3339(created_raw)
                         .map(|dt| dt.with_timezone(&Utc))
                         .unwrap_or_else(|_| Utc::now());
@@ -154,6 +171,14 @@ fn handle_view_threads(
                     let size_bytes = compute_conversation_size(fur_dir, tid_str, &msg_ids);
                     total_size_bytes += size_bytes;
 
+                    let tags_str = convo["tags"]
+                        .as_array()
+                        .unwrap_or(&vec![])
+                        .iter()
+                        .filter_map(|v| v.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+
                     conversation_info.push((
                         tid_str.to_string(),
                         title,
@@ -162,6 +187,7 @@ fn handle_view_threads(
                         msg_count,
                         parsed,
                         format_size(size_bytes),
+                        tags_str,
                     ));
                 }
             }
@@ -171,7 +197,7 @@ fn handle_view_threads(
     // Sort newest first
     conversation_info.sort_by(|a, b| b.5.cmp(&a.5));
 
-    for (i, (tid, title, date, time, msg_count, _, size_str)) in
+    for (i, (tid, title, date, time, msg_count, _, size_str, tags_str)) in
         conversation_info.iter().enumerate()
     {
         rows.push(vec![
@@ -180,6 +206,7 @@ fn handle_view_threads(
             format!("{} | {}", date, time),
             msg_count.to_string(),
             size_str.to_string(),
+            tags_str.to_string(),
         ]);
 
         if tid == active {
@@ -187,9 +214,10 @@ fn handle_view_threads(
         }
     }
 
+    // UPDATED HEADERS: now includes TAGS
     render_table(
         "Threads",
-        &["ID", "Title", "Created", "#Msgs", "Size"],
+        &["ID", "Title", "Created", "#Msgs", "Size", "Tags"],
         rows,
         active_idx,
     );
@@ -256,6 +284,97 @@ fn handle_switch_thread(
     );
 }
 
+fn handle_tagging(
+    args: &ThreadArgs,
+    index: &mut Value,
+    fur_dir: &Path,
+) {
+    let empty_vec: Vec<Value> = Vec::new();
+    let threads: Vec<String> = index["threads"]
+        .as_array()
+        .unwrap_or(&empty_vec)
+        .iter()
+        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+        .collect();
+
+    // Determine which conversation to operate on
+    let target_tid = if let Some(prefix) = &args.id {
+        let matches: Vec<&String> =
+            threads.iter().filter(|tid| tid.starts_with(prefix)).collect();
+
+        if matches.is_empty() {
+            eprintln!("❌ No conversation matches '{}'", prefix);
+            return;
+        }
+        if matches.len() > 1 {
+            eprintln!("❌ Ambiguous prefix '{}': {:?}", prefix, matches);
+            return;
+        }
+        matches[0].clone()
+    } else {
+        index["active_thread"].as_str().unwrap_or("").to_string()
+    };
+
+    let convo_path = fur_dir.join("threads").join(format!("{}.json", target_tid));
+    let mut convo: Value =
+        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
+
+    // -------------------------------
+    // CLEAR ALL TAGS
+    // -------------------------------
+    if args.clear_tags {
+        convo["tags"] = json!([]);
+        fs::write(&convo_path, serde_json::to_string_pretty(&convo).unwrap()).unwrap();
+        println!("🏷️ Cleared tags for {}", &target_tid[..8]);
+        return;
+    }
+
+    // Load existing tags
+    let mut existing: Vec<String> = convo["tags"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+
+    // -------------------------------
+    // REMOVE TAGS
+    // -------------------------------
+    if let Some(raw) = &args.untag {
+        let remove_list = parse_tag_list(raw);
+
+        existing.retain(|t| !remove_list.contains(t));
+
+        convo["tags"] = json!(existing);
+        fs::write(&convo_path, serde_json::to_string_pretty(&convo).unwrap()).unwrap();
+
+        println!(
+            "🏷️ Removed tag(s) [{}] from {}",
+            remove_list.join(", "),
+            &target_tid[..8]
+        );
+        return;
+    }
+
+    // -------------------------------
+    // ADD TAGS
+    // -------------------------------
+    if let Some(raw) = &args.tag {
+        let add_list = parse_tag_list(raw);
+
+        for t in add_list {
+            if !existing.contains(&t) {
+                existing.push(t);
+            }
+        }
+
+        convo["tags"] = json!(existing);
+        fs::write(&convo_path, serde_json::to_string_pretty(&convo).unwrap()).unwrap();
+
+        println!("🏷️ Updated tags for {}", &target_tid[..8]);
+        return;
+    }
+}
 
 /// Computes total storage: conversation.json + all message JSONs + all markdown attachments.
 fn compute_conversation_size(
