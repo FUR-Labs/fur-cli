@@ -111,13 +111,14 @@ All files are plain JSON or Markdown.
 
 ### Organize
 
-| Command                                    | Description                 |
-| ------------------------------------------ | --------------------------- |
-| `fur convo --tag research`                 | Add a tag                   |
-| `fur convo --tag "deep learning"`          | Add spaced tag (normalized) |
-| `fur convo --clear-tags`                   | Remove all tags             |
-| `fur search <query>`                       | Full-project search         |
-| `fur search "deep learning, optimization"` | Multi-query search          |
+| Command                                    | Description                         |
+| ------------------------------------------ | ----------------------------------- |
+| `fur convo --tag research`                 | Add a tag                           |
+| `fur convo --tag "deep learning"`          | Add spaced tag (normalized)         |
+| `fur convo --clear-tags`                   | Remove all tags                     |
+| `fur convo --delete <id>`                  | Permanently delete a conversation   |
+| `fur search <query>`                       | Full-project search                 |
+| `fur search "deep learning, optimization"` | Multi-query search                  |
 
 ### Export
 

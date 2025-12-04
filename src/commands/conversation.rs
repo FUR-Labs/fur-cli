@@ -3,6 +3,7 @@ use std::path::{Path};
 use serde_json::{Value, json};
 use clap::Parser;
 use chrono::{DateTime, Local, Utc};
+use crate::helpers::conversation::{resolve_target_thread_id,confirm_delete_primary,confirm_delete_destructive, perform_conversation_deletion};
 use crate::renderer::table::render_table;
 use crate::helpers::tags::parse_tag_list;
 
@@ -30,6 +31,10 @@ pub struct ThreadArgs {
     /// Clear all tags from conversation
     #[arg(long)]
     pub clear_tags: bool,
+
+    /// Delete a conversation (destructive)
+    #[arg(long)]
+    pub delete: bool,
 }
 
 pub fn run_conversation(args: ThreadArgs) {
@@ -50,6 +55,10 @@ pub fn run_conversation(args: ThreadArgs) {
 
     if args.rename.is_some() {
         return handle_rename_thread(&mut index, fur_dir, &args);
+    }
+
+    if args.delete {
+        return handle_delete_thread(&mut index, fur_dir, &args);
     }
 
     if args.view || args.id.is_none() {
@@ -119,6 +128,40 @@ fn handle_rename_thread(
         new_title
     );
 }
+
+
+fn handle_delete_thread(
+    index: &mut Value,
+    fur_dir: &Path,
+    args: &ThreadArgs,
+) {
+    let target_tid = match resolve_target_thread_id(index, args) {
+        Some(tid) => tid,
+        None => return,
+    };
+
+    // extract all thread IDs for later index update
+    let empty_vec: Vec<Value> = Vec::new();
+    let threads: Vec<String> = index["threads"]
+        .as_array()
+        .unwrap_or(&empty_vec)
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+
+    if !confirm_delete_primary() {
+        println!("❌ Deletion aborted.");
+        return;
+    }
+
+    if !confirm_delete_destructive() {
+        println!("❌ Deletion aborted.");
+        return;
+    }
+
+    perform_conversation_deletion(index, fur_dir, &target_tid, &threads);
+}
+
 
 
 fn handle_view_threads(
