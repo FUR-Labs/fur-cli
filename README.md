@@ -117,6 +117,7 @@ All files are plain JSON or Markdown.
 | `fur convo --tag "deep learning"`          | Add spaced tag (normalized)         |
 | `fur convo --clear-tags`                   | Remove all tags                     |
 | `fur convo --delete <id>`                  | Permanently delete a conversation   |
+| `fur clone [-i <id>] [--title <name>]`     | Deep-clone a conversation (full copy w/ Markdown)|
 | `fur search <query>`                       | Full-project search                 |
 | `fur search "deep learning, optimization"` | Multi-query search                  |
 
