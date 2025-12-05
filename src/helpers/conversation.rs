@@ -3,6 +3,7 @@ use std::path::{Path};
 use serde_json::{Value, json};
 use std::io::{self, Write};
 use crate::commands::conversation::ThreadArgs;
+use colored::*;
 
 pub fn resolve_target_thread_id(
     index: &Value,
@@ -62,8 +63,11 @@ pub fn confirm_delete_destructive() -> bool {
 
     println!();
     println!(
-        "\x1b[31m⚠️  Reminder: deleting a conversation is a destructive action.\n\
-         It cannot be reversed unless the project is version-controlled (git).\x1b[0m"
+        "{}",
+        "⚠️  Reminder: deleting a conversation is a destructive action.\n\
+         It cannot be reversed unless the project is version-controlled (git)."
+            .color(Color::BrightRed)
+            .bold()
     );
     println!();
     println!("Type DELETE to confirm:");

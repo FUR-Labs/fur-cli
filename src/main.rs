@@ -16,7 +16,7 @@ use crate::commands::{
     jump::{self, JumpArgs},
     timeline::{self, TimelineArgs},
     printed,
-    fork,
+    clone,
     status,
     tree::{self, TreeArgs},
     save::{self, SaveArgs},
@@ -97,12 +97,22 @@ enum Commands {
 
     // Management
     #[command(about = "Management:: See or create new conversation avatars/personas")]
-
     Avatar {
         #[command(subcommand)]
         action: Option<AvatarAction>,
         #[arg(long)]
         view: bool,
+    },
+
+    #[command(about = "Management:: Clone a conversation safely (deep copy)")]
+    Clone {
+        /// Optional: conversation ID or prefix
+        #[arg(short, long, default_value = "")]
+        id: String,
+
+        /// Optional: custom title for the new conversation
+        #[arg(short, long)]
+        title: Option<String>,
     },
 
     #[command(about = "Management:: See or jump to any of your conversations", visible_alias = "conversation")]
@@ -122,15 +132,7 @@ enum Commands {
     #[command(about = "Scripting:: Save your conversation as a .frs script")]
     Save(SaveArgs),
 
-
     // Experimental
-    #[command(about = "Under development:: Fork / Copy")]
-    Fork {
-        #[arg(short, long, default_value = "")]
-        id: String,
-        #[arg(short, long)]
-        title: Option<String>,
-    },
     #[command(about = "Under development:: Jump to specific chat within convo")]
     Jump(JumpArgs),
 
@@ -216,11 +218,11 @@ fn main() {
         Commands::Run { path } => run::run_frs(&path),
         Commands::Save(a) => save::run_save(a),
 
-        Commands::Fork { id, title } => {
+        Commands::Clone { id, title } => {
             if id.is_empty() {
-                fork::run_fork_from_active(title);
+                clone::run_clone_from_active(title);
             } else {
-                fork::run_fork(&id, title);
+                clone::run_clone(&id, title);
             }
         }
 
