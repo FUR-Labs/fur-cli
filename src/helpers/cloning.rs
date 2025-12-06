@@ -96,14 +96,45 @@ pub fn clone_markdown_if_any(old_msg: &Value) -> Option<String> {
         let old_md_path = PathBuf::from(md_raw);
 
         if old_md_path.exists() {
-            let ts = Utc::now().format("CHAT-%Y%m%d-%H%M%S.md").to_string();
-            let new_md = format!("chats/{}", ts);
-            fs::copy(&old_md_path, &new_md).expect("❌ Failed to copy markdown file");
-            return Some(new_md);
+            // Extract the base filename
+            let filename = old_md_path.file_name()?.to_string_lossy();
+
+            // Detect clone-depth (count trailing 'c')
+            let stem = filename.trim_end_matches(".md");
+            let (base, existing_c_suffix) = split_clone_suffix(stem);
+
+            // Generate the new suffix by appending one more 'c'
+            let new_suffix = format!("{}c", existing_c_suffix);
+
+            let new_filename = format!("{}{}.md", base, new_suffix);
+            let new_path = format!("chats/{}", new_filename);
+
+            fs::copy(&old_md_path, &new_path)
+                .expect("❌ Failed to copy markdown file");
+
+            return Some(new_path);
         }
     }
     None
 }
+
+/// Splits "CHAT-timestamp-ccc" → ("CHAT-timestamp-", "ccc")
+fn split_clone_suffix(stem: &str) -> (String, String) {
+    // Find where the trailing c's start
+    let c_count = stem.chars().rev().take_while(|&ch| ch == 'c').count();
+
+    if c_count == 0 {
+        // No suffix at all
+        return (stem.to_string(), String::new());
+    }
+
+    let base_len = stem.len() - c_count;
+    let base = stem[..base_len].to_string();
+    let suffix = stem[base_len..].to_string();
+
+    (base, suffix)
+}
+
 
 pub fn write_new_conversation(
     new_id: &str,
