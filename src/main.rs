@@ -6,6 +6,9 @@ mod utils;
 mod git;
 mod helpers;
 
+use std::path::Path;
+use serde_json::Value;
+use std::fs;
 use clap::{Parser, Subcommand, CommandFactory};
 use clap_complete::{generate, shells::{Bash, Zsh, Fish}};
 use std::io;
@@ -17,6 +20,7 @@ use crate::commands::{
     timeline::{self, TimelineArgs},
     printed,
     clone,
+    xclone,
     status,
     tree::{self, TreeArgs},
     save::{self, SaveArgs},
@@ -111,6 +115,21 @@ enum Commands {
         id: String,
 
         /// Optional: custom title for the new conversation
+        #[arg(short, long)]
+        title: Option<String>,
+    },
+
+    #[command(about = "Management:: Deep clone a conversation into another .fur project", visible_aliases = ["xc"])]
+    Xclone {
+        /// Path to the target project (folder containing .fur/)
+        #[arg(long)]
+        to: String,
+
+        /// Conversation ID or prefix (defaults to active thread)
+        #[arg(short, long, default_value = "")]
+        id: String,
+
+        /// Optional custom title for the cloned conversation
         #[arg(short, long)]
         title: Option<String>,
     },
@@ -211,6 +230,24 @@ fn main() {
         }
 
         Commands::Convo(a) => conversation::run_conversation(a),
+        Commands::Xclone { to, id, title } => {
+            // If no id given, fall back to active thread
+            let tid_to_clone = if id.is_empty() {
+                let index_path = Path::new(".fur").join("index.json");
+                let index: Value =
+                    serde_json::from_str(&fs::read_to_string(&index_path).unwrap())
+                    .expect("❌ Failed to read index.json");
+                index["active_thread"]
+                    .as_str()
+                    .expect("❌ No active thread set")
+                    .to_string()
+            } else {
+                id
+            };
+
+            xclone::run_xclone(&to, &tid_to_clone, title);
+        }
+
         Commands::Tree(a) => tree::run_tree(a),
         Commands::Search(a) => search::run_search(a),
         Commands::Gsearch(a) => sweep::run_sweep(a),

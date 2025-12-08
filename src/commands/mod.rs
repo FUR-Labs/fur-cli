@@ -3,6 +3,7 @@ pub mod new;
 pub mod jot;
 pub mod chat;
 pub mod clone;
+pub mod xclone;
 pub mod timeline;
 pub mod printed;
 pub mod status;
