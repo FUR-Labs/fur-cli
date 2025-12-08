@@ -35,6 +35,10 @@ pub struct ThreadArgs {
     /// Delete a conversation (destructive)
     #[arg(long)]
     pub delete: bool,
+
+    /// Show all conversations (no truncation)
+    #[arg(long, short = 'a')]
+    pub all: bool,
 }
 
 pub fn run_conversation(args: ThreadArgs) {
@@ -257,9 +261,20 @@ fn handle_view_threads(
         }
     }
 
+    // Apply truncation AFTER rows and active_idx exist
+    if !args.all {
+        rows = truncate_around_active(rows, active_idx);
+
+        // Recalculate active_idx inside truncated rows
+        let active_prefix = &active[..8];
+        active_idx = rows
+            .iter()
+            .position(|row| row[0] == active_prefix);
+    }
+
     // UPDATED HEADERS: now includes TAGS
     render_table(
-        "Threads",
+        "Conversations",
         &["ID", "Title", "Created", "#Msgs", "Size", "Tags"],
         rows,
         active_idx,
@@ -267,6 +282,31 @@ fn handle_view_threads(
 
     println!("----------------------------");
     println!("Total Memory Used: {}", format_size(total_size_bytes));
+}
+
+fn truncate_around_active(rows: Vec<Vec<String>>, active_idx: Option<usize>) -> Vec<Vec<String>> {
+    if active_idx.is_none() { return rows; }
+    let i = active_idx.unwrap();
+    let win = 3;
+
+    let start = i.saturating_sub(win);
+    let end   = (i + win).min(rows.len() - 1);
+
+    let mut out = Vec::new();
+
+    if start > 0 {
+        out.push(vec!["...".into(); rows[0].len()]);
+    }
+
+    for idx in start..=end {
+        out.push(rows[idx].clone());
+    }
+
+    if end < rows.len() - 1 {
+        out.push(vec!["...".into(); rows[0].len()]);
+    }
+
+    out
 }
 
 fn handle_switch_thread(
