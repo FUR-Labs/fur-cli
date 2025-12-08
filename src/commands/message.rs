@@ -3,6 +3,7 @@ use serde_json::{Value, json};
 use std::fs;
 use std::io::{Write};
 use std::path::Path;
+use crate::helpers::insertion::run_insert;
 
 /// Subcommand: `fur msg`
 #[derive(Parser, Debug)]
@@ -11,9 +12,14 @@ pub struct MsgArgs {
     #[arg(index = 1)]
     pub id_prefix: Option<String>,
 
-    /// Second positional: text
-    #[arg(index = 2)]
-    pub text_value: Option<String>,
+
+    /// Insert before target
+    #[arg(long)]
+    pub pre: bool,
+
+    /// Insert after target
+    #[arg(long)]
+    pub post: bool,
 
     #[arg(long)]
     pub edit: bool,
@@ -29,15 +35,40 @@ pub struct MsgArgs {
 
     #[arg(long)]
     pub interactive: bool,
+
+    /// Everything *after* the ID
+    #[arg(index = 2, trailing_var_arg = true)]
+    pub rest: Vec<String>,
+
 }
+
 
 /// Entry point
 pub fn run_msg(args: MsgArgs) {
+
     if args.delete {
         return run_delete(args);
     }
-    run_edit(args);
+
+    // INSERT BEFORE
+    if args.pre {
+        return run_insert(&args, true);
+    }
+
+    // INSERT AFTER
+    if args.post {
+        return run_insert(&args, false);
+    }
+
+    if args.edit {
+        return run_edit(args);
+    }
+
+    eprintln!("❌ msg requires: --pre | --post | --edit | --delete");
 }
+
+
+
 
 //
 // ======================================================
@@ -55,7 +86,8 @@ fn run_delete(args: MsgArgs) {
 
     let mut buf = String::new();
     std::io::stdin().read_line(&mut buf).unwrap();
-    if !["y", "Y", "yes", "YES"].contains(&buf.trim()) {
+
+    if !["y","Y","yes","YES"].contains(&buf.trim()) {
         println!("❌ Cancelled.");
         return;
     }
@@ -74,35 +106,32 @@ fn run_delete(args: MsgArgs) {
 //
 
 fn run_edit(args: MsgArgs) {
-    let (id_opt, mut new_text) =
-        classify_id_and_text(args.id_prefix, args.text_value);
+    let (id_opt, mut text_opt) = classify_id_or_text(&args);
 
     // Final target message ID
-    let mid = id_opt.unwrap_or_else(|| resolve_target_message(None));
+    let id = id_opt.unwrap_or_else(|| resolve_target_message(None));
 
     let fur = Path::new(".fur");
-    let msg_path = fur.join("messages").join(format!("{}.json", mid));
+    let msg_path = fur.join("messages").join(format!("{}.json", id));
 
     let mut msg: Value =
         serde_json::from_str(&fs::read_to_string(&msg_path).unwrap()).unwrap();
 
     // Interactive override
     if args.interactive {
-        let edited = run_interactive_editor(
-            msg["text"].as_str().unwrap_or_default()
-        );
-        new_text = Some(edited);
+        let edited = run_interactive_editor(msg["text"].as_str().unwrap_or_default());
+        text_opt = Some(edited);
     }
 
     // Apply text
-    if let Some(t) = new_text {
+    if let Some(t) = text_opt {
         msg["text"] = json!(t);
         msg["markdown"] = json!(null);
     }
 
     // Apply markdown
-    if let Some(fpath) = args.file {
-        msg["markdown"] = json!(fpath);
+    if let Some(fp) = args.file {
+        msg["markdown"] = json!(fp);
         msg["text"] = json!(null);
     }
 
@@ -113,66 +142,64 @@ fn run_edit(args: MsgArgs) {
 
     write_json(&msg_path, &msg);
 
-    println!("✏️ Edited {}", &mid[..8]);
+    println!("✏️ Edited {}", &id[..8]);
 }
 
+
+
 //
 // ======================================================
-//  POSITONAL ARG PARSING LOGIC
+//  POSITONAL ID RESOLUTION
 // ======================================================
 //
 
-/// Detect if a value looks like a message ID prefix.
-/// Returns Some(full_id) or None.
-fn detect_id(x: &Option<String>) -> Option<String> {
-    let Some(val) = x else { return None; };
+/// Detect if value looks like an ID prefix.
+pub fn detect_id(x: &Option<String>) -> Option<String> {
+    let Some(val) = x else { return None };
 
-    // positional that begins with "--" cannot be ID
     if val.starts_with("--") {
         return None;
     }
 
-    // Try to match existing prefix
-    if let Some(id) = resolve_prefix_if_exists(val) {
-        return Some(id);
-    }
-
-    None
+    resolve_prefix_if_exists(val)
 }
 
-/// Interpret positionals into (id, text)
-///
-/// Rules:
-///   - If first positional matches a prefix → ID
-///   - Second positional always text
-///   - If first positional does NOT match → treat as text
-fn classify_id_and_text(
-    id_prefix: Option<String>,
-    text_value: Option<String>
-) -> (Option<String>, Option<String>) {
 
-    // Case 1: first positional is a valid ID prefix
-    if id_prefix.is_some() {
-        if let Some(real_id) = detect_id(&id_prefix) {
-            return (Some(real_id), text_value);
+/// Determine if the call looked like:
+///   msg <id> --edit new text...
+/// OR:
+///   msg "some text" --edit
+pub fn classify_id_or_text(args: &MsgArgs) -> (Option<String>, Option<String>) {
+    // Case A: First positional *could* be an ID
+    if let Some(pfx) = &args.id_prefix {
+        if let Some(full_id) = detect_id(&Some(pfx.clone())) {
+            // ID detected
+            return (Some(full_id), extract_text_from_rest(args));
         }
+
+        // Not an ID → treat as text
+        return (None, Some(pfx.clone()));
     }
 
-    // Case 2: first positional is actually text
-    if let Some(val) = id_prefix {
-        return (None, Some(val));
-    }
-
-    // Case 3: only second positional is provided
-    if let Some(val) = text_value {
-        return (None, Some(val));
-    }
-
-    (None, None)
+    // No id_prefix → rely on rest as text
+    (None, extract_text_from_rest(args))
 }
 
+/// Combine trailing args into text
+fn extract_text_from_rest(args: &MsgArgs) -> Option<String> {
+    if args.rest.is_empty() {
+        None
+    } else {
+        Some(args.rest.join(" "))
+    }
+}
 
-/// Internal helper: check for prefix match safely  
+//
+// ======================================================
+//  PREFIX UTILITIES
+// ======================================================
+//
+
 fn resolve_prefix_if_exists(pfx: &str) -> Option<String> {
     let fur = Path::new(".fur");
     let (_index, tid) = resolve_active_conversation();
@@ -181,15 +208,15 @@ fn resolve_prefix_if_exists(pfx: &str) -> Option<String> {
     let convo: Value =
         serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
-    let root = convo["messages"]
+    let root_ids = convo["messages"]
         .as_array()
         .unwrap_or(&vec![])
         .iter()
         .filter_map(|x| x.as_str().map(|s| s.to_string()))
-        .collect::<Vec<String>>();
+        .collect::<Vec<_>>();
 
     let matches: Vec<&String> =
-        root.iter().filter(|id| id.starts_with(pfx)).collect();
+        root_ids.iter().filter(|id| id.starts_with(pfx)).collect();
 
     if matches.len() == 1 {
         Some(matches[0].clone())
@@ -200,7 +227,7 @@ fn resolve_prefix_if_exists(pfx: &str) -> Option<String> {
 
 //
 // ======================================================
-//  ID RESOLUTION HELPERS
+//  ACTIVE CONVERSATION RESOLUTION
 // ======================================================
 //
 
@@ -208,38 +235,39 @@ fn resolve_active_conversation() -> (Value, String) {
     let idx_path = Path::new(".fur/index.json");
     let index: Value =
         serde_json::from_str(&fs::read_to_string(idx_path).unwrap()).unwrap();
+
     let tid = index["active_thread"].as_str().unwrap_or("").to_string();
+
     (index, tid)
 }
 
-fn resolve_target_message(prefix: Option<String>) -> String {
+pub fn resolve_target_message(prefix: Option<String>) -> String {
     let fur = Path::new(".fur");
 
     let (index, tid) = resolve_active_conversation();
     let convo_path = fur.join("threads").join(format!("{}.json", tid));
+
     let convo: Value =
         serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
-    let root = convo["messages"]
+    let root_ids = convo["messages"]
         .as_array()
-        .unwrap_or(&vec![])
+        .unwrap()
         .iter()
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect::<Vec<String>>();
+        .collect::<Vec<_>>();
 
-    if let Some(p) = prefix {
-        return resolve_prefix(&root, &p);
+    if let Some(pfx) = prefix {
+        return resolve_prefix(&root_ids, &pfx);
     }
 
-    // current_message wins
     if let Some(cur) = index["current_message"].as_str() {
         if !cur.is_empty() {
             return cur.to_string();
         }
     }
 
-    // fallback → last root
-    root.last().expect("❌ No messages").to_string()
+    root_ids.last().expect("❌ No messages").to_string()
 }
 
 fn resolve_prefix(root_ids: &Vec<String>, prefix: &str) -> String {
@@ -268,19 +296,12 @@ fn recursive_delete(mid: &str) {
     let fur = Path::new(".fur");
     let msg_path = fur.join("messages").join(format!("{}.json", mid));
 
-    let content = match fs::read_to_string(&msg_path) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-
-    let msg: Value = match serde_json::from_str(&content) {
-        Ok(v) => v,
-        Err(_) => return,
-    };
+    let Ok(content) = fs::read_to_string(&msg_path) else { return };
+    let Ok(msg) = serde_json::from_str::<Value>(&content) else { return };
 
     if let Some(children) = msg["children"].as_array() {
-        for c in children {
-            if let Some(cid) = c.as_str() {
+        for child in children {
+            if let Some(cid) = child.as_str() {
                 recursive_delete(cid);
             }
         }
@@ -292,11 +313,12 @@ fn recursive_delete(mid: &str) {
 fn remove_from_parent_or_root(mid: &str) {
     let fur = Path::new(".fur");
 
+    // Load deleted msg metadata (if exists)
     let msg_path = fur.join("messages").join(format!("{}.json", mid));
     let raw = fs::read_to_string(&msg_path).unwrap_or("{}".into());
     let msg: Value = serde_json::from_str(&raw).unwrap_or(json!({}));
 
-    // If message had a parent
+    // If part of a thread tree
     if let Some(pid) = msg["parent"].as_str() {
         let ppath = fur.join("messages").join(format!("{}.json", pid));
         if let Ok(content) = fs::read_to_string(&ppath) {
@@ -309,9 +331,10 @@ fn remove_from_parent_or_root(mid: &str) {
         return;
     }
 
-    // Else: it's root-level in conversation
+    // Otherwise part of root list
     let (_index, tid) = resolve_active_conversation();
     let convo_path = fur.join("threads").join(format!("{}.json", tid));
+
     let mut convo: Value =
         serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
@@ -325,6 +348,7 @@ fn remove_from_parent_or_root(mid: &str) {
 fn update_current_after_delete(mid: &str) {
     let fur = Path::new(".fur");
     let idx_path = fur.join("index.json");
+
     let mut index: Value =
         serde_json::from_str(&fs::read_to_string(&idx_path).unwrap()).unwrap();
 
