@@ -97,14 +97,22 @@ pub fn run_conversation(args: ThreadArgs) {
         return handle_legacy_tags(&args, &mut index, fur_dir);
     }
 
-    // 2. column system
+    // 2. GLOBAL COLUMN SYSTEM
     if args.col_new.is_some()
         || args.col_rename.is_some()
         || args.col_add.is_some()
         || args.col_remove.is_some()
         || args.col_clear.is_some()
     {
-        return handle_column_ops(args, &mut index, fur_dir);
+        crate::helpers::conversation::columns::handle_column_ops(
+            args,
+            &mut index,
+            fur_dir,
+        );
+
+        let index_path = fur_dir.join("index.json");
+        fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+        return;
     }
 
     // 3. sorting
@@ -153,7 +161,7 @@ fn handle_thread_rename(
     let raw = fs::read_to_string(&convo_path).unwrap();
     let mut convo: Value = serde_json::from_str(&raw).unwrap();
 
-    convo = upgrade_conversation_schema(convo);
+    convo = upgrade_conversation_schema(convo, index);
 
     let old_title = convo["title"]
         .as_str()

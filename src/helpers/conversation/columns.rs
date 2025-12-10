@@ -1,28 +1,31 @@
 use std::fs;
 use std::path::Path;
+
 use serde_json::{Value, json};
 
-use crate::schema::upgrade_conversation_schema;
-use crate::helpers::tags::{parse_tag_list, normalize_tag};
+use crate::helpers::tags::{normalize_tag, parse_tag_list};
 use crate::helpers::conversation::tid::resolve_tid;
 
-/* ============================================================================
-   COLUMN OPERATIONS (SAFE + CORRECT VERSION)
-   - dynamic metadata columns
-   - display name mapping
-   - correct schema reinforcement
-   - always reinserts updated fields back into convo
-   - no unwrap panics
-============================================================================ */
+use crate::helpers::conversation::global::{
+    load_global_schema,
+    create_global_column,
+    rename_global_column,
+    ensure_convo_has_all_global_columns,
+};
+
+use crate::schema::upgrade_conversation_schema;
+
+/* =============================================================================
+   GLOBAL COLUMN CONTROLLER
+============================================================================= */
 
 pub fn handle_column_ops(
     args: crate::commands::conversation::ThreadArgs,
     index: &mut Value,
     fur_dir: &Path,
 ) {
-    /* ----------------------------------------------------------
-       1. Resolve thread ID
-    ---------------------------------------------------------- */
+    let index_path = fur_dir.join("index.json");
+
     let tid = match resolve_tid(index, &args.id) {
         Some(t) => t,
         None => return,
@@ -32,55 +35,20 @@ pub fn handle_column_ops(
     let raw = fs::read_to_string(&convo_path).unwrap();
     let mut convo: Value = serde_json::from_str(&raw).unwrap();
 
-    /* ----------------------------------------------------------
-       2. Upgrade schema (ensures meta exists)
-    ---------------------------------------------------------- */
-    convo = upgrade_conversation_schema(convo);
+    convo = upgrade_conversation_schema(convo, index);
 
-    /* ----------------------------------------------------------
-       3. Get meta object safely
-    ---------------------------------------------------------- */
-    let meta = convo["meta"].as_object_mut().unwrap();
+    let (global_cols, _order) = load_global_schema(index);
 
-    // Guarantee required subkeys exist
-    if !meta.contains_key("columns") {
-        meta.insert("columns".into(), json!({}));
-    }
-    if !meta.contains_key("display_names") {
-        meta.insert("display_names".into(), json!({}));
-    }
+    /* ---------------- GLOBAL COLUMN CREATION ---------------- */
+    if let Some(new_raw) = args.col_new {
+        let internal = normalize_tag(&new_raw);
+        let display = to_title_case(&internal);
 
-    /* ----------------------------------------------------------
-       4. Extract and remove (SAFE)
-    ---------------------------------------------------------- */
-    let columns_val = meta.remove("columns").unwrap_or(json!({}));
-    let display_val = meta.remove("display_names").unwrap_or(json!({}));
-
-    let mut columns = columns_val.as_object().cloned().unwrap_or_default();
-    let mut display_names = display_val.as_object().cloned().unwrap_or_default();
-
-    /* ----------------------------------------------------------
-       5. CREATE NEW COLUMN
-    ---------------------------------------------------------- */
-    if let Some(raw_col) = args.col_new {
-        let internal = normalize_tag(&raw_col);
-
-        if columns.contains_key(&internal) {
-            eprintln!("⚠️ Column '{}' already exists.", internal);
-        } else {
-            columns.insert(internal.clone(), json!([]));
-            display_names.insert(internal.clone(), to_title_case(&internal).into());
-            println!("📌 Created column '{}'", internal);
-        }
-
-        write_back(&convo_path, &mut convo, columns, display_names);
+        create_global_column(&internal, &display, index, &index_path, fur_dir);
         return;
     }
 
-    /* ----------------------------------------------------------
-       6. RENAME DISPLAY NAME ONLY
-          Format: --col-rename col=new name
-    ---------------------------------------------------------- */
+    /* ---------------- GLOBAL RENAME ------------------ */
     if let Some(rename_raw) = args.col_rename {
         let parts: Vec<&str> = rename_raw.split('=').collect();
         if parts.len() != 2 {
@@ -89,24 +57,18 @@ pub fn handle_column_ops(
         }
 
         let internal = normalize_tag(parts[0]);
-        let new_name = parts[1].trim();
-
-        if !columns.contains_key(&internal) {
-            eprintln!("❌ Column '{}' does not exist.", internal);
-            return;
-        }
-
-        display_names.insert(internal.clone(), new_name.into());
-        println!("✏️  Column '{}' display renamed to '{}'", internal, new_name);
-
-        write_back(&convo_path, &mut convo, columns, display_names);
+        let new_display = parts[1].trim();
+        rename_global_column(&internal, new_display, index, &index_path);
         return;
     }
 
-    /* ----------------------------------------------------------
-       7. ADD VALUES
-          Format: --col-add col=v1,v2
-    ---------------------------------------------------------- */
+    /* ---------------- ENSURE ALL GLOBAL COLUMNS EXIST ---------------- */
+    ensure_convo_has_all_global_columns(&mut convo, &global_cols);
+
+    let meta = convo["meta"].as_object_mut().unwrap();
+    let cols = meta["columns"].as_object_mut().unwrap();
+
+    /* ---------------- ADD VALUES ------------------ */
     if let Some(add_raw) = args.col_add {
         let parts: Vec<&str> = add_raw.split('=').collect();
         if parts.len() != 2 {
@@ -115,39 +77,30 @@ pub fn handle_column_ops(
         }
 
         let internal = normalize_tag(parts[0]);
-        if !columns.contains_key(&internal) {
-            eprintln!("❌ Column '{}' does not exist.", internal);
+        if !global_cols.contains_key(&internal) {
+            eprintln!("❌ Global column '{}' does not exist.", internal);
             return;
         }
 
-        let items = parse_tag_list(parts[1]);
-        let arr = columns
-            .get_mut(&internal)
-            .unwrap()
-            .as_array_mut()
-            .unwrap();
+        let new_vals = parse_tag_list(parts[1]);
+        let arr = cols.get_mut(&internal).unwrap().as_array_mut().unwrap();
 
-        for tag in items {
-            let exists = arr.iter().any(|x| x.as_str() == Some(&tag));
-            if !exists {
-                arr.push(Value::String(tag));
+        for v in new_vals {
+            if !arr.iter().any(|x| x.as_str() == Some(&v)) {
+                arr.push(Value::String(v));
             }
         }
 
         if internal == "tags" {
-            sync_legacy_tags(&mut convo);
+            convo["tags"] = arr.clone().into();
         }
 
+        save(&convo_path, &convo);
         println!("➕ Added values to '{}'", internal);
-
-        write_back(&convo_path, &mut convo, columns, display_names);
         return;
     }
 
-    /* ----------------------------------------------------------
-       8. REMOVE VALUES
-          Format: --col-remove col=v1,v2
-    ---------------------------------------------------------- */
+    /* ---------------- REMOVE VALUES ------------------ */
     if let Some(remove_raw) = args.col_remove {
         let parts: Vec<&str> = remove_raw.split('=').collect();
         if parts.len() != 2 {
@@ -156,83 +109,46 @@ pub fn handle_column_ops(
         }
 
         let internal = normalize_tag(parts[0]);
-        if !columns.contains_key(&internal) {
-            eprintln!("❌ Column '{}' does not exist.", internal);
+        if !global_cols.contains_key(&internal) {
+            eprintln!("❌ Global column '{}' does not exist.", internal);
             return;
         }
 
-        let remove_list = parse_tag_list(parts[1]);
-        let arr = columns
-            .get_mut(&internal)
-            .unwrap()
-            .as_array_mut()
-            .unwrap();
+        let remove_vals = parse_tag_list(parts[1]);
+        let arr = cols.get_mut(&internal).unwrap().as_array_mut().unwrap();
 
-        arr.retain(|v| {
-            let s = v.as_str().unwrap_or("");
-            !remove_list.contains(&s.to_string())
-        });
+        arr.retain(|v| !remove_vals.contains(&v.as_str().unwrap_or("").to_string()));
 
         if internal == "tags" {
-            sync_legacy_tags(&mut convo);
+            convo["tags"] = arr.clone().into();
         }
 
+        save(&convo_path, &convo);
         println!("➖ Removed values from '{}'", internal);
-        write_back(&convo_path, &mut convo, columns, display_names);
         return;
     }
 
-    /* ----------------------------------------------------------
-       9. CLEAR COLUMN
-          Format: --col-clear colname
-    ---------------------------------------------------------- */
-    if let Some(raw) = args.col_clear {
-        let internal = normalize_tag(&raw);
-
-        if !columns.contains_key(&internal) {
-            eprintln!("❌ Column '{}' does not exist.", internal);
+    /* ---------------- CLEAR VALUES ------------------ */
+    if let Some(clear_raw) = args.col_clear {
+        let internal = normalize_tag(&clear_raw);
+        if !global_cols.contains_key(&internal) {
+            eprintln!("❌ Global column '{}' does not exist.", internal);
             return;
         }
 
-        columns.insert(internal.clone(), json!([]));
-
+        cols.insert(internal.clone(), json!([]));
         if internal == "tags" {
-            sync_legacy_tags(&mut convo);
+            convo["tags"] = json!([]);
         }
 
-        println!("🧹 Cleared column '{}'", internal);
-        write_back(&convo_path, &mut convo, columns, display_names);
+        save(&convo_path, &convo);
+        println!("🧹 Cleared '{}'", internal);
         return;
     }
 }
 
-/* ============================================================================
-   INTERNAL HELPERS
-============================================================================ */
-
-/// Put updated columns + display_names back into convo and save.
-fn write_back(
-    path: &Path,
-    convo: &mut Value,
-    columns: serde_json::Map<String, Value>,
-    display_names: serde_json::Map<String, Value>,
-) {
-    let meta = convo["meta"].as_object_mut().unwrap();
-    meta.insert("columns".into(), Value::Object(columns));
-    meta.insert("display_names".into(), Value::Object(display_names));
-
+fn save(path: &Path, convo: &Value) {
     fs::write(path, serde_json::to_string_pretty(convo).unwrap()).unwrap();
-}
-
-fn sync_legacy_tags(convo: &mut Value) {
-    let tags = convo["meta"]["columns"]["tags"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-        .collect::<Vec<_>>();
-
-    convo["tags"] = json!(tags);
 }
 
 fn to_title_case(s: &str) -> String {
@@ -241,7 +157,7 @@ fn to_title_case(s: &str) -> String {
             let mut chars = w.chars();
             match chars.next() {
                 None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+                Some(f) => f.to_uppercase().collect::<String>() + chars.as_str()
             }
         })
         .collect::<Vec<_>>()

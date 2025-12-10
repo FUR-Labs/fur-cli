@@ -56,7 +56,8 @@ pub fn view_conversations(
         if let Ok(raw) = fs::read_to_string(&path) {
             if let Ok(mut convo) = serde_json::from_str::<Value>(&raw) {
                 // Always upgrade schema first
-                convo = upgrade_conversation_schema(convo);
+                convo = upgrade_conversation_schema(convo, index);
+
 
                 // Metadata
                 let title = convo["title"]
