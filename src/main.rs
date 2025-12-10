@@ -86,6 +86,9 @@ enum Commands {
     #[command(about = "Everyday:: Edit or Delete a jotted message")]
     Msg(MsgArgs),
 
+    #[command(about = "Everyday:: Show full conversation (replaces timeline --verbose)")]
+    Show(TimelineArgs),
+
     #[command(about = "Everyday:: Print timeline of full conversation.")]
     Timeline(TimelineArgs),
 
@@ -220,6 +223,11 @@ fn main() {
         Commands::Chat { avatar } => chat::run_chat(avatar),
         Commands::Msg(a) => message::run_msg(a),
         Commands::Timeline(a) => timeline::run_timeline(a),
+        Commands::Show(a) => {
+            let mut a = a;
+            a.verbose = true;   // force verbose mode
+            timeline::run_timeline(a);
+        }
         Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
 
         Commands::Avatar { action, view: _ } => {
