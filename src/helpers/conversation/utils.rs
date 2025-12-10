@@ -2,50 +2,7 @@ use std::fs;
 use std::path::{Path};
 use serde_json::{Value, json};
 use std::io::{self, Write};
-use crate::commands::conversation::ThreadArgs;
 use colored::*;
-
-pub fn resolve_target_thread_id(
-    index: &Value,
-    args: &ThreadArgs,
-) -> Option<String> {
-    let empty_vec: Vec<Value> = Vec::new();
-    let threads: Vec<String> = index["threads"]
-        .as_array()
-        .unwrap_or(&empty_vec)
-        .iter()
-        .filter_map(|t| t.as_str().map(|s| s.to_string()))
-        .collect();
-
-    // If ID prefix provided
-    if let Some(prefix) = &args.id {
-        let matches: Vec<&String> = threads
-            .iter()
-            .filter(|tid| tid.starts_with(prefix))
-            .collect();
-
-        return match matches.as_slice() {
-            [] => {
-                eprintln!("❌ No conversation matches '{}'", prefix);
-                None
-            }
-            [single] => Some((*single).clone()),
-            _ => {
-                eprintln!("❌ Ambiguous prefix '{}': {:?}", prefix, matches);
-                None
-            }
-        };
-    }
-
-    // Otherwise use active thread
-    let active = index["active_thread"].as_str().unwrap_or("").to_string();
-    if active.is_empty() {
-        eprintln!("❌ No active conversation to delete.");
-        return None;
-    }
-
-    Some(active)
-}
 
 pub fn confirm_delete_primary() -> bool {
 
