@@ -1,9 +1,37 @@
+use std::fs;
+use std::path::Path;
+use std::collections::HashMap;
+use serde_json::Value;
+
 use crate::frs::avatars::{load_avatars, save_avatars, get_random_emoji_for_name};
 use crate::frs::emojis::{preview_emojis, search_emojis};
 use serde_json::json;
 use colored::*;
 use crate::renderer::table::render_table;
 use crate::commands::utils::input::{ask_string, ask_raw, ask_yes_no, default_yes};
+
+fn count_messages_per_avatar() -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    let messages_dir = Path::new(".fur/messages");
+
+    if !messages_dir.exists() {
+        return counts;
+    }
+
+    if let Ok(entries) = fs::read_dir(messages_dir) {
+        for entry in entries.flatten() {
+            if let Ok(content) = fs::read_to_string(entry.path()) {
+                if let Ok(json) = serde_json::from_str::<Value>(&content) {
+                    if let Some(avatar) = json["avatar"].as_str() {
+                        *counts.entry(avatar.to_string()).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    counts
+}
 
 pub fn run_avatar_view() {
     let avatars = load_avatars();
@@ -17,19 +45,36 @@ pub fn run_avatar_view() {
         let mut rows = Vec::new();
         let mut active_idx = None;
 
+        let msg_counts = count_messages_per_avatar();
+
         for (i, (name, val)) in map.iter().enumerate() {
             if name == "main" {
                 if let Some(target) = val.as_str() {
-                    rows.push(vec!["⭐ main".to_string(), target.to_string()]);
+                    let count = msg_counts.get(target).copied().unwrap_or(0);
+                    rows.push(vec![
+                        "⭐ main".to_string(),
+                        target.to_string(),
+                        count.to_string(),
+                    ]);
                     active_idx = Some(i);
                 }
             } else {
                 let emoji = val.as_str().unwrap_or("🐾");
-                rows.push(vec![name.to_string(), emoji.to_string()]);
+                let count = msg_counts.get(name).copied().unwrap_or(0);
+                rows.push(vec![
+                    name.to_string(),
+                    emoji.to_string(),
+                    count.to_string(),
+                ]);
             }
         }
 
-        render_table("Avatars", &["Role", "Emoji"], rows, active_idx);
+        render_table(
+            "Avatars",
+            &["Role", "Emoji", "Messages"],
+            rows,
+            active_idx,
+        );
     }
 }
 
