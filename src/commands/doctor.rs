@@ -1,23 +1,22 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use indicatif::{ProgressBar, ProgressStyle};
 
-use serde_json::Value;
-use walkdir::WalkDir;
-use sha2::{Sha256, Digest};
 use clap::Parser;
 use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use walkdir::WalkDir;
 
 #[derive(Parser, Debug)]
 pub struct DoctorArgs {
-
-    /// Search the entire home directory for moved attachments
+    /// Expand search to home directory
     #[arg(long)]
     pub deep: bool,
 
-    /// Remove attachment references that cannot be recovered
-    /// (always performs a deep search first)
+    /// Remove unrecoverable attachment metadata
+    /// (always performs deep search first)
     #[arg(long)]
     pub clean: bool,
 }
@@ -31,34 +30,21 @@ pub fn run_doctor(args: DoctorArgs) {
         return;
     }
 
-    let messages_dir = fur_dir.join("messages");
-
     println!("🩺 FUR Doctor\n");
 
-    let deep = args.deep || args.clean;
-
-    let search_root: PathBuf = if deep {
-        println!("Deep scan enabled.\n");
-        dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
-    } else {
-        PathBuf::from(".")
-    };
+    let messages_dir = fur_dir.join("messages");
 
     let mut missing: HashMap<String, Vec<PathBuf>> = HashMap::new();
-    let mut message_paths: Vec<PathBuf> = Vec::new();
 
     for entry in fs::read_dir(&messages_dir).unwrap() {
 
-        let path = entry.unwrap().path();
+        let msg_path = entry.unwrap().path();
 
-        if !path.is_file() {
+        if !msg_path.is_file() {
             continue;
         }
 
-        message_paths.push(path.clone());
-
-        let content = fs::read_to_string(&path).unwrap();
-
+        let content = fs::read_to_string(&msg_path).unwrap();
         let msg: Value = serde_json::from_str(&content).unwrap();
 
         if let Some(md_path) = msg["markdown"].as_str() {
@@ -68,7 +54,7 @@ pub fn run_doctor(args: DoctorArgs) {
                 missing
                     .entry(md_path.to_string())
                     .or_default()
-                    .push(path.clone());
+                    .push(msg_path.clone());
             }
         }
     }
@@ -80,11 +66,14 @@ pub fn run_doctor(args: DoctorArgs) {
 
     println!("Missing attachments\n-------------------");
 
-    for (path, refs) in &missing {
-        println!("⚠ {} ({} references)", path, refs.len());
+    for (p, refs) in &missing {
+        println!("⚠ {} ({} references)", p, refs.len());
     }
 
-    
+    println!();
+
+    let search_roots = collect_roots(args.deep);
+
     let pb = ProgressBar::new_spinner();
 
     pb.set_style(
@@ -94,27 +83,119 @@ pub fn run_doctor(args: DoctorArgs) {
     );
 
     pb.enable_steady_tick(std::time::Duration::from_millis(120));
+    pb.set_message("Searching filesystem envelope...");
 
-    pb.set_message("Scanning filesystem...");
-
-
-    let mut recovered: usize = 0;
+    let mut recovered_refs = 0usize;
     let mut unrecoverable: Vec<String> = Vec::new();
+    let mut recovered_items: Vec<(String, String, usize)> = Vec::new();
 
     for (missing_path, msg_refs) in &missing {
 
+        let filename = extract_filename(missing_path);
+        let size = extract_size(&msg_refs[0]);
         let hash = extract_hash(&msg_refs[0]);
 
-        if hash.is_none() {
+        if filename.is_none() || size.is_none() || hash.is_none() {
             unrecoverable.push(missing_path.clone());
             continue;
         }
 
+        let filename = filename.unwrap();
+        let size = size.unwrap();
         let hash = hash.unwrap();
 
-        if let Some(found) = search_by_hash(&hash, &search_root, &pb) {
+        let mut found_path: Option<PathBuf> = None;
 
-            println!("Recovered: {} → {}", missing_path, found.display());
+        fn check_candidate(
+            path: &Path,
+            filename: &str,
+            hash: &str,
+            found: &mut Option<PathBuf>
+        ) {
+
+            if !path.is_file() {
+                return;
+            }
+
+            if path.file_name()
+                .and_then(|f| f.to_str())
+                .map(|f| f == filename)
+                .unwrap_or(false)
+            {
+
+                if let Ok(bytes) = fs::read(path) {
+
+                    let mut hasher = Sha256::new();
+                    hasher.update(&bytes);
+
+                    let result = format!("{:x}", hasher.finalize());
+
+                    if result == hash {
+                        *found = Some(path.to_path_buf());
+                    }
+                }
+            }
+        }
+
+        for root in &search_roots {
+
+            if let Ok(entries) = fs::read_dir(root) {
+                for e in entries.flatten() {
+                    let path = e.path();
+                    check_candidate(&path, filename, &hash, &mut found_path);
+                    if found_path.is_some() { break; }
+                }
+            }
+
+            if found_path.is_some() { break; }
+
+            for entry in WalkDir::new(root)
+                .max_depth(if args.deep { 10 } else { 4 })
+                .follow_links(false)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+
+                let path = entry.path();
+
+                if !path.is_file() {
+                    continue;
+                }
+
+                if path.file_name()
+                    .and_then(|f| f.to_str())
+                    .map(|f| f == filename)
+                    .unwrap_or(false)
+                {
+
+                    if let Ok(meta) = fs::metadata(path) {
+
+                        if meta.len() == size {
+
+                            if let Ok(bytes) = fs::read(path) {
+
+                                let mut hasher = Sha256::new();
+                                hasher.update(&bytes);
+
+                                let result = format!("{:x}", hasher.finalize());
+
+                                if result == hash {
+
+                                    found_path = Some(path.to_path_buf());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if found_path.is_some() {
+                break;
+            }
+        }
+
+        if let Some(found) = found_path {
 
             for msg_file in msg_refs {
 
@@ -129,7 +210,13 @@ pub fn run_doctor(args: DoctorArgs) {
                 ).unwrap();
             }
 
-            recovered += msg_refs.len();
+            recovered_refs += msg_refs.len();
+
+            recovered_items.push((
+                missing_path.clone(),
+                found.display().to_string(),
+                msg_refs.len()
+            ));
 
         } else {
 
@@ -137,12 +224,16 @@ pub fn run_doctor(args: DoctorArgs) {
         }
     }
 
+    pb.finish_and_clear();
+
+
     if !unrecoverable.is_empty() {
 
-        println!("\nUnrecoverable attachments\n-------------------------");
+        println!("{}", "\nUnrecoverable attachments".bold().truecolor(255,105,180));
+        println!("{}", "-------------------------".truecolor(255,105,180));
 
         for p in &unrecoverable {
-            println!("✖ {}", p);
+            println!("✖ {}", p.truecolor(255,105,180));
         }
 
         println!();
@@ -150,23 +241,32 @@ pub fn run_doctor(args: DoctorArgs) {
         println!("{}", "Tip".bold().bright_yellow());
         println!(
             "  {}",
-            "Run `fur doctor --deep` to search your system for moved files."
-                .bold()
+            "Run `fur doctor --deep` to search your home directory.".bold()
         );
-
         println!(
             "  {}",
-            "Run `fur doctor --clean` only if you are sure the files are gone."
-                .bold()
+            "Run `fur doctor --clean` only if you are sure the files are gone.".bold()
         );
-
         println!(
             "  {}",
-            "(--clean always performs a deep search first.)"
-                .dimmed()
+            "(--clean always performs a deep search first.)".dimmed()
         );
     }
 
+    if !recovered_items.is_empty() {
+
+        println!("{}", "\nRecovered attachments".bold().green());
+        println!("{}", "---------------------".green());
+
+        for (orig, new, refs) in &recovered_items {
+
+            println!("✔ {}", orig.green());
+            println!("  → {}", new);
+            println!("  ({} reference repaired)\n", refs);
+        }
+    }
+
+    
     if args.clean {
 
         println!("\nCleaning orphan attachment metadata...\n");
@@ -194,20 +294,44 @@ pub fn run_doctor(args: DoctorArgs) {
         println!("✔ Orphan attachment metadata cleaned.");
     }
 
-    pb.finish_with_message("Filesystem scan complete.");
-    
     println!("\nSummary");
     println!("-------");
-    println!("Recovered references: {}", recovered);
+    println!("Recovered references: {}", recovered_refs);
     println!("Unrecoverable attachments: {}", unrecoverable.len());
 
     println!("\nDoctor finished.");
 }
 
+fn collect_roots(deep: bool) -> Vec<PathBuf> {
+
+    let mut roots = Vec::new();
+
+    let mut current = std::env::current_dir().unwrap();
+
+    for _ in 0..4 {
+
+        roots.push(current.clone());
+
+        if let Some(parent) = current.parent() {
+            current = parent.to_path_buf();
+        } else {
+            break;
+        }
+    }
+
+    if deep {
+
+        if let Some(home) = dirs::home_dir() {
+            roots.push(home);
+        }
+    }
+
+    roots
+}
+
 fn extract_hash(msg_path: &Path) -> Option<String> {
 
     let content = fs::read_to_string(msg_path).ok()?;
-
     let msg: Value = serde_json::from_str(&content).ok()?;
 
     msg["markdown_meta"]["hash"]
@@ -215,37 +339,15 @@ fn extract_hash(msg_path: &Path) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-fn search_by_hash(target: &str, root: &Path, pb: &ProgressBar) -> Option<PathBuf> {
+fn extract_size(msg_path: &Path) -> Option<u64> {
 
-    for entry in WalkDir::new(root)
-        .follow_links(false)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        let path = entry.path();
+    let content = fs::read_to_string(msg_path).ok()?;
+    let msg: Value = serde_json::from_str(&content).ok()?;
 
-        pb.inc(1);
+    msg["markdown_meta"]["size"].as_u64()
+}
 
-        if !path.is_file() {
-            continue;
-        }
+fn extract_filename(path: &str) -> Option<&str> {
 
-        if let Ok(bytes) = fs::read(path) {
-
-            let mut hasher = Sha256::new();
-            hasher.update(&bytes);
-
-            let result = format!("{:x}", hasher.finalize());
-
-            if result == target {
-                return Some(path.to_path_buf());
-            }
-        }
-
-        if pb.position() % 1000 == 0 {
-            pb.set_message(format!("Scanned {} files...", pb.position()));
-        }
-    }
-
-    None
+    Path::new(path).file_name()?.to_str()
 }

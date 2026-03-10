@@ -5,6 +5,7 @@ mod schema;
 mod utils;
 mod git;
 mod helpers;
+use colored::Colorize;
 
 use std::path::Path;
 use serde_json::Value;
@@ -12,10 +13,12 @@ use std::fs;
 use clap::{Parser, Subcommand, CommandFactory};
 use clap_complete::{generate, shells::{Bash, Zsh, Fish}};
 use std::io;
+
 use crate::commands::{
     avatar,
     jot::{self, JotArgs},
     chat,
+    doctor::{self, DoctorArgs},
     jump::{self, JumpArgs},
     timeline::{self, TimelineArgs},
     printed,
@@ -72,6 +75,8 @@ enum Commands {
         args: Vec<String>,
     },
 
+    #[command(about = "Repair missing or moved attachments")]
+    Doctor(DoctorArgs),
 
     // Everyday
     #[command(about = "Everyday:: Start a new conversation (new convo)")]
@@ -157,8 +162,6 @@ enum Commands {
     // Experimental
     #[command(about = "Under development:: Jump to specific chat within convo")]
     Jump(JumpArgs),
-
-
 }
 
 #[derive(Subcommand)]
@@ -191,6 +194,7 @@ fn dispatch_git(cmd: GitCmd) {
 }
 
 fn main() {
+
     let args: Vec<String> = std::env::args().collect();
 
     // .frs shortcut
@@ -201,9 +205,26 @@ fn main() {
 
     let cli = Cli::parse();
 
+    if schema::detect_old_schema() {
+
+        println!(
+            "{}",
+            "⚠ Older FUR schema detected.".bright_yellow().bold()
+        );
+
+        if schema::ask_yes_no("Run metadata migration now?") {
+            schema::run_backfill_meta();
+        } else {
+            println!("Skipping migration.\n");
+        }
+    }
+
     match cli.command {
+
         Commands::Completions { shell } => {
+
             let mut cmd = Cli::command();
+
             match shell.as_str() {
                 "bash" => generate(Bash, &mut cmd, "fur", &mut io::stdout()),
                 "zsh"  => generate(Zsh,  &mut cmd, "fur", &mut io::stdout()),
@@ -212,6 +233,8 @@ fn main() {
             }
         }
 
+        Commands::Doctor(args) => doctor::run_doctor(args),
+
         Commands::Status {} => dispatch_git(GitCmd::Status),
         Commands::Add { args } => dispatch_git(GitCmd::Add(args)),
         Commands::Commit { args } => dispatch_git(GitCmd::Commit(args)),
@@ -219,18 +242,24 @@ fn main() {
         Commands::Pull { args } => dispatch_git(GitCmd::Pull(args)),
 
         Commands::New { name } => new::run_new(name),
+
         Commands::Jot(a) => jot::run_jot(a),
+
         Commands::Chat { avatar } => chat::run_chat(avatar),
+
         Commands::Msg(a) => message::run_msg(a),
+
         Commands::Timeline(a) => timeline::run_timeline(a),
+
         Commands::Show(a) => {
             let mut a = a;
             a.verbose = true;   // force verbose mode
             timeline::run_timeline(a);
         }
+
         Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
 
-        Commands::Avatar { action, view: _ } => {
+        Commands::Avatar { action, .. } => {
             match action {
                 Some(AvatarAction::New) => avatar::run_avatar_onboarding(),
                 None => avatar::run_avatar_view(),
@@ -261,6 +290,7 @@ fn main() {
         Commands::Gsearch(a) => sweep::run_sweep(a),
 
         Commands::Run { path } => run::run_frs(&path),
+
         Commands::Save(a) => save::run_save(a),
 
         Commands::Clone { id, title } => {

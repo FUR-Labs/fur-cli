@@ -2,6 +2,7 @@ pub mod avatar;
 pub mod new;
 pub mod jot;
 pub mod chat;
+pub mod doctor;
 pub mod clone;
 pub mod xclone;
 pub mod timeline;

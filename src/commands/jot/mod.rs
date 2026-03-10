@@ -1,8 +1,10 @@
 mod core;
 
+pub use core::upgrade_message_schema;
+
 use clap::Parser;
 use serde_json::Value;
-use core::*;
+use self::core::*;
 
 #[derive(Parser, Debug)]
 pub struct JotArgs {
