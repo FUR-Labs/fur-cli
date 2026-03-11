@@ -53,6 +53,7 @@ Core capabilities:
 - Jot mode and chat import  
 - Markdown attachments and export  
 - `.frs` conversation scripting  
+- Project encryption (`fur lock` / `fur unlock`)  
 - Fast, portable, offline
 
 ---
@@ -79,6 +80,8 @@ cargo install --path . --force
 .fur/
  ├── index.json            # master index
  ├── avatars.json          # persona aliases
+ ├── lock.json             # encryption state
+ ├── .lockcheck            # password verification
  ├── threads/              # per-conversation metadata
  └── messages/             # per-message storage
 ```
@@ -129,6 +132,18 @@ All files are plain JSON or Markdown.
 | `fur save`    | Export as `.frs` script           |
 | `fur gsearch` | Scan all FUR journals on disk     |
 
+### Security
+
+| Command | Description |
+|--------|-------------|
+| `fur lock` | Encrypt the entire diary |
+| `fur unlock` | Decrypt the diary |
+| `fur lock --hide` | Hide password input |
+| `fur unlock --hide` | Hide password input |
+
+FUR encrypts all conversations, messages, and Markdown attachments using AES-256-GCM.
+
+Passwords are verified before unlocking to prevent corruption or mutation when an incorrect password is provided.
 
 ---
 
@@ -230,7 +245,6 @@ Future enhancements include:
 * Advanced editors for message modification
 * Enhanced search output formats
 * New export templates
-* Optional encrypted diaries
 * Cross-platform installers
 
 ---

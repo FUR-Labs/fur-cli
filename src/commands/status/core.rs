@@ -40,7 +40,7 @@ pub fn load_conversation_messages(
 
         let msg_path = messages_dir.join(format!("{}.json", mid));
 
-        if let Ok(content) = fs::read_to_string(&msg_path) {
+        if let Some(content) = crate::security::io::read_text_file(&msg_path) {
 
             if let Ok(mut obj) = serde_json::from_str::<Value>(&content) {
 
@@ -101,8 +101,11 @@ pub fn first_message_fallback(conversation: &Value) -> String {
 }
 
 fn read_json(path: &Path) -> Value {
+
+    use crate::security::io::read_text_file;
+
     serde_json::from_str(
-        &fs::read_to_string(path)
-            .expect("❌ Cannot read JSON")
+        &read_text_file(path)
+            .expect("❌ Project locked. Run `fur unlock`.")
     ).unwrap()
 }

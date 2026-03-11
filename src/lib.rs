@@ -3,3 +3,4 @@ pub mod frs;
 pub mod renderer;
 pub mod schema;
 pub mod helpers;
+pub mod security;

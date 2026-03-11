@@ -181,7 +181,7 @@ fn attach_to_parent(
         .join("messages")
         .join(format!("{}.json", parent_id));
 
-    if let Ok(content) = fs::read_to_string(&parent_path) {
+    if let Some(content) = crate::security::io::read_text_file(&parent_path) {
 
         if let Ok(mut parent) = serde_json::from_str::<Value>(&content) {
 
@@ -230,9 +230,11 @@ pub fn print_confirmation(
 
 fn read_json(path: &Path) -> Value {
 
+    use crate::security::io::read_text_file;
+
     serde_json::from_str(
-        &fs::read_to_string(path)
-            .expect("Cannot read JSON")
+        &read_text_file(path)
+            .expect("❌ Project locked. Run `fur unlock`.")
     ).unwrap()
 }
 

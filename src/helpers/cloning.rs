@@ -7,7 +7,9 @@ use std::collections::HashMap;
 
 pub fn load_conversation_metadata(path: &Path) -> (String, Vec<String>) {
     let convo: Value =
-        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        serde_json::from_str(
+            &crate::security::io::read_text_file(path).unwrap()
+        ).unwrap();
 
     let title = convo["title"].as_str().unwrap_or("Untitled").to_string();
 
@@ -43,10 +45,13 @@ pub fn clone_all_messages(id_map: &HashMap<String, String>, old_messages: &[Stri
     let messages_dir = Path::new(".fur/messages");
 
     for old_id in old_messages {
+        
         let old_msg_path = messages_dir.join(format!("{}.json", old_id));
 
-        let old_msg: Value =
-            serde_json::from_str(&fs::read_to_string(&old_msg_path).unwrap()).unwrap();
+        let raw = crate::security::io::read_text_file(&old_msg_path)
+            .expect("🔒 Project locked. Run `fur unlock` first.");
+
+        let old_msg: Value = serde_json::from_str(&raw).unwrap();
 
         let new_id = id_map.get(old_id).unwrap();
 
@@ -165,7 +170,9 @@ pub fn write_new_conversation(
 pub fn update_index(new_id: &str) {
     let index_path = Path::new(".fur/index.json");
     let mut index: Value =
-        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+        serde_json::from_str(
+            &crate::security::io::read_text_file(&index_path).unwrap()
+        ).unwrap();
 
     index["threads"]
         .as_array_mut()

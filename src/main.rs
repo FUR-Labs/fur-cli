@@ -1,4 +1,5 @@
 mod commands;
+mod security;
 mod renderer;
 mod frs;
 mod schema;
@@ -75,9 +76,12 @@ enum Commands {
         args: Vec<String>,
     },
 
-    #[command(about = "Repair missing or moved attachments")]
-    Doctor(DoctorArgs),
+    #[command(about = "Security:: Encrypt the current fur diary")]
+    Lock(security::lock::LockArgs),
 
+    #[command(about = "Security:: Decrypt the current fur diary")]
+    Unlock(security::unlock::UnlockArgs),
+    
     // Everyday
     #[command(about = "Everyday:: Start a new conversation (new convo)")]
     New { name: String },
@@ -106,6 +110,9 @@ enum Commands {
 
     #[command(about = "Everyday:: Search all conversations for text or markdown matches")]
     Search(SearchArgs),
+
+    #[command(about = "Management:: Repair missing or moved attachments")]
+    Doctor(DoctorArgs),
 
     // Management
     #[command(about = "Management:: See or create new conversation avatars/personas")]
@@ -233,7 +240,8 @@ fn main() {
             }
         }
 
-        Commands::Doctor(args) => doctor::run_doctor(args),
+        Commands::Lock(args) => security::lock::run_lock(args),
+        Commands::Unlock(args) => security::unlock::run_unlock(args),
 
         Commands::Status {} => dispatch_git(GitCmd::Status),
         Commands::Add { args } => dispatch_git(GitCmd::Add(args)),
@@ -258,6 +266,8 @@ fn main() {
         }
 
         Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
+
+        Commands::Doctor(args) => doctor::run_doctor(args),
 
         Commands::Avatar { action, .. } => {
             match action {

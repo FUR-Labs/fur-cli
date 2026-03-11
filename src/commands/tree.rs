@@ -23,8 +23,10 @@ pub fn run_tree(args: TreeArgs) {
 
     // Load index and conversation
     let index_data: Value =
-        serde_json::from_str(&fs::read_to_string(&index_path).expect("❌ Cannot read index.json"))
-            .unwrap();
+        serde_json::from_str(
+            &crate::security::io::read_text_file(&index_path)
+                .expect("❌ Project locked. Run `fur unlock`.")
+        ).unwrap();
 
     let conversation_id = if let Some(ref override_id) = args.conversation_override {
         override_id
@@ -33,8 +35,10 @@ pub fn run_tree(args: TreeArgs) {
     };
     let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
     let conversation_data: Value =
-        serde_json::from_str(&fs::read_to_string(&convo_path).expect("❌ Cannot read conversation"))
-            .unwrap();
+        serde_json::from_str(
+            &crate::security::io::read_text_file(&convo_path)
+                .expect("❌ Project locked. Run `fur unlock`.")
+        ).unwrap();
 
     // Load avatars.json once
     let avatars: Value = serde_json::from_str(
@@ -68,7 +72,7 @@ fn load_conversation_messages(fur_dir: &Path, conversation: &Value) -> HashMap<S
 
     while let Some(mid) = to_visit.pop() {
         let path = fur_dir.join("messages").join(format!("{}.json", mid));
-        if let Ok(content) = fs::read_to_string(path) {
+        if let Some(content) = crate::security::io::read_text_file(&path) {
             if let Ok(json) = serde_json::from_str::<Value>(&content) {
                 // enqueue children + branches
                 if let Some(children) = json["children"].as_array() {

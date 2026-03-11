@@ -23,6 +23,11 @@ pub struct DoctorArgs {
 
 pub fn run_doctor(args: DoctorArgs) {
 
+    if crate::security::state::is_locked() {
+        println!("🔒 Project locked. Run `fur unlock` first.");
+        return;
+    }
+    
     let fur_dir = Path::new(".fur");
 
     if !fur_dir.exists() {
