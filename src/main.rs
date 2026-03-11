@@ -81,7 +81,13 @@ enum Commands {
 
     #[command(about = "Security:: Decrypt the current fur diary")]
     Unlock(security::unlock::UnlockArgs),
-    
+
+    #[command(about = "Security:: Generate a Diceware passphrase for encryption")]
+    Keygen {
+        #[arg(short, long, default_value_t = 6)]
+        words: usize,
+    },
+
     // Everyday
     #[command(about = "Everyday:: Start a new conversation (new convo)")]
     New { name: String },
@@ -242,7 +248,19 @@ fn main() {
 
         Commands::Lock(args) => security::lock::run_lock(args),
         Commands::Unlock(args) => security::unlock::run_unlock(args),
+        Commands::Keygen { words } => {
 
+            let (pass, entropy) =
+                security::crypto::generate_password(words);
+
+            println!("\nGenerated passphrase:\n{}\n", pass);
+
+            println!("Entropy ≈ {:.1} bits\n", entropy);
+
+            if entropy < 70.0 {
+                println!("⚠ Warning: low entropy passphrase (recommended ≥ 6 words)");
+            }
+        }
         Commands::Status {} => dispatch_git(GitCmd::Status),
         Commands::Add { args } => dispatch_git(GitCmd::Add(args)),
         Commands::Commit { args } => dispatch_git(GitCmd::Commit(args)),

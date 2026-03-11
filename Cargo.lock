@@ -39,9 +39,9 @@ dependencies = [
 
 [[package]]
 name = "aesus"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9e8db979f814b6078951287ced855ad67c3692c969712dff5c4a78b8f8dd64b"
+checksum = "3d31a5b1675fcdc9ca39678f7861e26afcf4cbc3676ab392c53e158716847844"
 dependencies = [
  "aes-gcm",
  "argon2",

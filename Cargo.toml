@@ -30,7 +30,7 @@ dirs = "6.0.0"
 regex = "1"
 sha2 = "0.10.9"
 indicatif = "0.17"
-aesus = "0.3"
+aesus = "0.4"
 rpassword = "7"
 
 [dev-dependencies]
