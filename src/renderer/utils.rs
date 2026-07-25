@@ -1,7 +1,7 @@
+use chrono::{DateTime, FixedOffset, Local};
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
-use chrono::{DateTime, FixedOffset, Local};
 
 use crate::frs::avatars::resolve_avatar;
 
@@ -13,13 +13,11 @@ pub struct MessageInfo {
     pub emoji: String,
     pub text: String,
     pub markdown: Option<String>,
-    pub attachment: Option<String>, 
+    pub attachment: Option<String>,
     #[allow(dead_code)]
     pub children: Vec<String>,
     pub branches: Vec<Vec<String>>,
 }
-
-
 
 pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<MessageInfo> {
     let msg_path = fur_dir.join("messages").join(format!("{}.json", msg_id));
@@ -30,7 +28,10 @@ pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<Mes
     let raw_time = msg_json["timestamp"].as_str().unwrap_or("???");
     let (date_str, time_str) = if let Ok(dt) = raw_time.parse::<DateTime<FixedOffset>>() {
         let local_dt = dt.with_timezone(&Local);
-        (local_dt.format("%Y-%m-%d").to_string(), local_dt.format("%H:%M:%S").to_string())
+        (
+            local_dt.format("%Y-%m-%d").to_string(),
+            local_dt.format("%H:%M:%S").to_string(),
+        )
     } else {
         (raw_time.to_string(), "".to_string())
     };
@@ -40,20 +41,28 @@ pub fn load_message(fur_dir: &Path, msg_id: &str, avatars: &Value) -> Option<Mes
     let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
     // Text & markdown
-    let text = msg_json["text"].as_str().unwrap_or("<no content>").to_string();
+    let text = msg_json["text"]
+        .as_str()
+        .unwrap_or("<no content>")
+        .to_string();
     let markdown = msg_json["markdown"].as_str().map(|s| s.to_string());
 
     // Children
     let children = msg_json["children"]
         .as_array()
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_else(Vec::new);
 
     // Branches
     let branches = msg_json["branches"]
         .as_array()
         .map(|outer| {
-            outer.iter()
+            outer
+                .iter()
                 .filter_map(|block| {
                     block.as_array().map(|arr| {
                         arr.iter()

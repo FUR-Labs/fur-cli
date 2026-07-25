@@ -1,11 +1,9 @@
-use std::fs;
-use std::path::{Path};
-use serde_json::{Value, json};
 use crate::helpers::cloning::{
-    load_conversation_metadata,
-    make_new_conversation_header,
-    build_id_remap,
+    build_id_remap, load_conversation_metadata, make_new_conversation_header,
 };
+use serde_json::{json, Value};
+use std::fs;
+use std::path::Path;
 
 /// Ensure target project has a minimal .fur/ structure + chats/
 fn ensure_target_project(dst_root: &Path) {
@@ -28,8 +26,7 @@ fn clone_messages_into_target(
     for old_id in old_messages {
         let src_path = src_msgs_dir.join(format!("{}.json", old_id));
 
-        let old_msg: Value =
-            serde_json::from_str(&fs::read_to_string(&src_path).unwrap()).unwrap();
+        let old_msg: Value = serde_json::from_str(&fs::read_to_string(&src_path).unwrap()).unwrap();
 
         let new_id = id_map.get(old_id).unwrap();
         let mut new_msg = old_msg.clone();
@@ -45,14 +42,16 @@ fn clone_messages_into_target(
         }
 
         if let Some(children) = old_msg["children"].as_array() {
-            new_msg["children"] = json!(children.iter()
+            new_msg["children"] = json!(children
+                .iter()
                 .filter_map(|v| v.as_str())
                 .filter_map(|id| id_map.get(id))
                 .collect::<Vec<_>>());
         }
 
         if let Some(branches) = old_msg["branches"].as_array() {
-            new_msg["branches"] = json!(branches.iter()
+            new_msg["branches"] = json!(branches
+                .iter()
                 .filter_map(|v| v.as_str())
                 .filter_map(|id| id_map.get(id))
                 .collect::<Vec<_>>());
@@ -60,15 +59,22 @@ fn clone_messages_into_target(
 
         // --- MARKDOWN FIX HERE ---
         if let Some(md_rel) = old_msg["markdown"].as_str() {
-            let src_md = src_msgs_dir.parent().unwrap().parent().unwrap().join(md_rel);
+            let src_md = src_msgs_dir
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(md_rel);
             let dst_md = dst_msgs_dir
-                .parent().unwrap().parent().unwrap() // <target> root
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap() // <target> root
                 .join(md_rel); // always "chats/...md"
 
             if src_md.exists() {
                 fs::create_dir_all(dst_md.parent().unwrap()).unwrap();
-                fs::copy(&src_md, &dst_md)
-                    .expect("❌ Failed to copy markdown attachment");
+                fs::copy(&src_md, &dst_md).expect("❌ Failed to copy markdown attachment");
             }
 
             new_msg["markdown"] = json!(md_rel);
@@ -126,7 +132,10 @@ fn update_target_index(dst_root: &Path, new_tid: &str) {
         })
     };
 
-    index["threads"].as_array_mut().unwrap().push(json!(new_tid));
+    index["threads"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(new_tid));
     index["active_thread"] = json!(new_tid);
     index["current_message"] = json!(null);
 
@@ -148,8 +157,7 @@ pub fn run_xclone(to: &str, tid: &str, title: Option<String>) {
 
     let (old_title, old_messages) = load_conversation_metadata(&src_convo_path);
 
-    let (new_tid, new_title, timestamp) =
-        make_new_conversation_header(&old_title, title);
+    let (new_tid, new_title, timestamp) = make_new_conversation_header(&old_title, title);
 
     let id_map = build_id_remap(&old_messages);
 

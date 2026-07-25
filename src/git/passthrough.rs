@@ -32,4 +32,3 @@ pub fn passthrough(subcommand: &str, args: &[String]) {
         eprintln!("{}", "❌ Failed to run git command".red());
     }
 }
-

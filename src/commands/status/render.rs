@@ -1,26 +1,21 @@
+use crate::frs::avatars::resolve_avatar;
 use colored::*;
 use serde_json::Value;
 use std::collections::HashMap;
-use crate::frs::avatars::resolve_avatar;
 
 type Map = HashMap<String, Value>;
 
 /// Print active conversation title
 pub fn print_active_conversation(index: &Value, conversation: &Value) {
-    let fallback_title = conversation["title"]
-        .as_str()
-        .unwrap_or("Untitled");
+    let fallback_title = conversation["title"].as_str().unwrap_or("Untitled");
 
-    let title = index["title"]
-        .as_str()
-        .unwrap_or(fallback_title);
+    let title = index["title"].as_str().unwrap_or(fallback_title);
 
     println!(
         "{} {} {}",
         "Active conversation:".bright_cyan().bold(),
         title.bright_green().bold(),
-        format!("({})", index["active_thread"].as_str().unwrap_or("?"))
-            .bright_black()
+        format!("({})", index["active_thread"].as_str().unwrap_or("?")).bright_black()
     );
 }
 
@@ -34,11 +29,7 @@ pub fn print_current_message(current_msg_id: &str) {
 }
 
 /// Print lineage (ancestors)
-pub fn print_lineage(
-    map: &HashMap<String, Value>,
-    current: &str,
-    avatars: &Value
-) {
+pub fn print_lineage(map: &HashMap<String, Value>, current: &str, avatars: &Value) {
     let mut chain = vec![];
     let mut cur = current.to_string();
 
@@ -57,13 +48,19 @@ pub fn print_lineage(
             let avatar_key = msg["avatar"].as_str().unwrap_or("???");
             let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
-            let text = msg.get("text")
+            let text = msg
+                .get("text")
                 .and_then(|v| v.as_str())
                 .or_else(|| msg["markdown"].as_str())
                 .unwrap_or("<no content>");
 
-            let preview = text.lines().next().unwrap_or("")
-                .chars().take(40).collect::<String>();
+            let preview = text
+                .lines()
+                .next()
+                .unwrap_or("")
+                .chars()
+                .take(40)
+                .collect::<String>();
 
             let marker = if mid == current {
                 "(current)".cyan().bold()
@@ -86,12 +83,7 @@ pub fn print_lineage(
     }
 }
 
-pub fn print_next_messages(
-    map: &Map,
-    conversation: &Value,
-    current: &str,
-    avatars: &Value,
-) {
+pub fn print_next_messages(map: &Map, conversation: &Value, current: &str, avatars: &Value) {
     let curr_msg = match map.get(current) {
         Some(v) => v,
         None => return println!("{}", "(No current message found.)".red()),
@@ -114,7 +106,6 @@ pub fn print_next_messages(
     }
 }
 
-
 fn get_children(curr_msg: &Value) -> Option<Vec<String>> {
     let arr = curr_msg["children"].as_array()?;
     let v = arr
@@ -122,7 +113,11 @@ fn get_children(curr_msg: &Value) -> Option<Vec<String>> {
         .filter_map(|c| c.as_str().map(|s| s.to_string()))
         .collect::<Vec<_>>();
 
-    if v.is_empty() { None } else { Some(v) }
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
 }
 
 fn get_sibling_branch(map: &Map, curr_msg: &Value, current: &str) -> Option<Vec<String>> {
@@ -133,7 +128,8 @@ fn get_sibling_branch(map: &Map, curr_msg: &Value, current: &str) -> Option<Vec<
     for block in blocks {
         if let Some(arr) = block.as_array() {
             if let Some(pos) = arr.iter().position(|v| v.as_str() == Some(current)) {
-                let sibs = arr.iter()
+                let sibs = arr
+                    .iter()
                     .skip(pos + 1)
                     .filter_map(|v| v.as_str().map(|s| s.to_string()))
                     .collect::<Vec<_>>();
@@ -151,26 +147,36 @@ fn get_top_level_siblings(conversation: &Value, current: &str) -> Option<Vec<Str
     let arr = conversation["messages"].as_array()?;
 
     let pos = arr.iter().position(|v| v.as_str() == Some(current))?;
-    let v = arr.iter()
+    let v = arr
+        .iter()
         .skip(pos + 1)
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect::<Vec<_>>();
 
-    if v.is_empty() { None } else { Some(v) }
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
 }
-
 
 fn render_preview(msg: &Value, avatars: &Value, cid: &str, map: &Map) {
     let avatar_key = msg["avatar"].as_str().unwrap_or("???");
     let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
-    let text = msg.get("text")
+    let text = msg
+        .get("text")
         .and_then(|v| v.as_str())
         .or_else(|| msg["markdown"].as_str())
         .unwrap_or("<no content>");
 
-    let preview = text.lines().next().unwrap_or("")
-        .chars().take(40).collect::<String>();
+    let preview = text
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .take(40)
+        .collect::<String>();
 
     let branch_label = compute_branch_label(cid, map);
 
@@ -184,12 +190,8 @@ fn render_preview(msg: &Value, avatars: &Value, cid: &str, map: &Map) {
     );
 }
 
-
 /// Compute branch label
-pub fn compute_branch_label(
-    msg_id: &str,
-    map: &HashMap<String, Value>
-) -> String {
+pub fn compute_branch_label(msg_id: &str, map: &HashMap<String, Value>) -> String {
     let mut labels = vec![];
     let mut cur = msg_id;
 

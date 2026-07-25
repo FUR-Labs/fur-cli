@@ -1,12 +1,12 @@
-use uuid::Uuid;
 use chrono::Utc;
 use serde_json::{json, Value};
 use std::fs;
-use std::path::Path;
 use std::io::{self, Write};
+use std::path::Path;
+use uuid::Uuid;
 
-use crate::frs::ast::{Thread, Message};
 use crate::frs::ast::ScriptItem;
+use crate::frs::ast::{Message, Thread};
 
 /// Persist a parsed Thread into .fur/threads + .fur/messages
 pub fn persist_frs(conversation: &Thread) -> String {
@@ -31,7 +31,10 @@ pub fn persist_frs(conversation: &Thread) -> String {
                     if let Ok(tjson) = serde_json::from_str::<Value>(&txt) {
                         if tjson["title"].as_str() == Some(&conversation.title) {
                             // Found duplicate title
-                            println!("⚠️ Thread with title \"{}\" already exists.", conversation.title);
+                            println!(
+                                "⚠️ Thread with title \"{}\" already exists.",
+                                conversation.title
+                            );
                             print!("Overwrite? [Y/n]: ");
                             io::stdout().flush().unwrap();
 
@@ -43,7 +46,10 @@ pub fn persist_frs(conversation: &Thread) -> String {
                                 overwrite = true;
                                 old_conversation_id = Some(tid_str.to_string());
                             } else {
-                                println!("🚫 Skipped importing conversation \"{}\".", conversation.title);
+                                println!(
+                                    "🚫 Skipped importing conversation \"{}\".",
+                                    conversation.title
+                                );
                                 return tid_str.to_string();
                             }
                         }
@@ -69,12 +75,20 @@ pub fn persist_frs(conversation: &Thread) -> String {
 
     // Persist only the *root* jots; recursion handles nested branches
     let root_ids = persist_level(
-        &conversation.items.iter().filter_map(|item| {
-            if let ScriptItem::Message(m) = item { Some(m) } else { None }
-        }).cloned().collect::<Vec<_>>(),
-        None
+        &conversation
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let ScriptItem::Message(m) = item {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect::<Vec<_>>(),
+        None,
     );
-
 
     let conversation_json = json!({
         "id": conversation_id,
@@ -84,24 +98,39 @@ pub fn persist_frs(conversation: &Thread) -> String {
         "messages": root_ids, // only roots here
     });
 
-    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_json).unwrap())
-        .expect("❌ Could not write conversation file");
+    let convo_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", conversation_id));
+    fs::write(
+        &convo_path,
+        serde_json::to_string_pretty(&conversation_json).unwrap(),
+    )
+    .expect("❌ Could not write conversation file");
 
     // Update index.json
-    index_data["threads"].as_array_mut().unwrap().push(conversation_id.clone().into());
+    index_data["threads"]
+        .as_array_mut()
+        .unwrap()
+        .push(conversation_id.clone().into());
     index_data["active_thread"] = conversation_id.clone().into();
     index_data["current_message"] = Value::Null;
     if index_data["schema_version"].as_str() == Some("0.1") {
         index_data["schema_version"] = Value::String("0.2".to_string());
     }
 
-    fs::write(&index_path, serde_json::to_string_pretty(&index_data).unwrap()).unwrap();
+    fs::write(
+        &index_path,
+        serde_json::to_string_pretty(&index_data).unwrap(),
+    )
+    .unwrap();
 
-    println!("🌱 Imported conversation into .fur: {} — \"{}\"", &conversation_id[..8], conversation.title);
+    println!(
+        "🌱 Imported conversation into .fur: {} — \"{}\"",
+        &conversation_id[..8],
+        conversation.title
+    );
     conversation_id
 }
-
 
 /// Ephemeral persist: writes a conversation into `.fur/tmp/` for previews.
 /// Returns ephemeral conversation_id.
@@ -115,10 +144,19 @@ pub fn persist_ephemeral(conversation: &Thread) -> String {
     let timestamp = Utc::now().to_rfc3339();
 
     let root_ids = persist_level(
-        &conversation.items.iter().filter_map(|item| {
-            if let ScriptItem::Message(m) = item { Some(m) } else { None }
-        }).cloned().collect::<Vec<_>>(),
-        None
+        &conversation
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let ScriptItem::Message(m) = item {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect::<Vec<_>>(),
+        None,
     );
 
     let conversation_json = json!({
@@ -130,8 +168,11 @@ pub fn persist_ephemeral(conversation: &Thread) -> String {
     });
 
     let convo_path = fur_dir.join(format!("{}.json", conversation_id));
-    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_json).unwrap())
-        .expect("❌ Could not write ephemeral conversation file");
+    fs::write(
+        &convo_path,
+        serde_json::to_string_pretty(&conversation_json).unwrap(),
+    )
+    .expect("❌ Could not write ephemeral conversation file");
 
     conversation_id
 }
@@ -144,12 +185,12 @@ pub fn cleanup_ephemeral(conversation_id: &str) {
     // NOTE: if we want to also clean messages, we can follow `delete_message_recursive`.
 }
 
-
-
 /// Delete an old conversation and all its message files.
 fn delete_old_conversation(conversation_id: &str) {
     let fur_dir = Path::new(".fur");
-    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
+    let convo_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", conversation_id));
 
     if let Ok(content) = fs::read_to_string(&convo_path) {
         if let Ok(conversation_json) = serde_json::from_str::<Value>(&content) {

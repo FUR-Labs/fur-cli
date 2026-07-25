@@ -1,14 +1,14 @@
+use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::collections::HashMap;
-use serde_json::Value;
 
-use crate::frs::avatars::{load_avatars, save_avatars, get_random_emoji_for_name};
+use crate::commands::utils::input::{ask_raw, ask_string, ask_yes_no, default_yes};
+use crate::frs::avatars::{get_random_emoji_for_name, load_avatars, save_avatars};
 use crate::frs::emojis::{preview_emojis, search_emojis};
-use serde_json::json;
-use colored::*;
 use crate::renderer::table::render_table;
-use crate::commands::utils::input::{ask_string, ask_raw, ask_yes_no, default_yes};
+use colored::*;
+use serde_json::json;
 
 fn count_messages_per_avatar() -> HashMap<String, usize> {
     let mut counts = HashMap::new();
@@ -61,20 +61,11 @@ pub fn run_avatar_view() {
             } else {
                 let emoji = val.as_str().unwrap_or("🐾");
                 let count = msg_counts.get(name).copied().unwrap_or(0);
-                rows.push(vec![
-                    name.to_string(),
-                    emoji.to_string(),
-                    count.to_string(),
-                ]);
+                rows.push(vec![name.to_string(), emoji.to_string(), count.to_string()]);
             }
         }
 
-        render_table(
-            "Avatars",
-            &["Role", "Emoji", "Messages"],
-            rows,
-            active_idx,
-        );
+        render_table("Avatars", &["Role", "Emoji", "Messages"], rows, active_idx);
     }
 }
 
@@ -107,7 +98,7 @@ fn create_main_avatar(avatars: &mut serde_json::Value) {
 
     avatars["main"] = json!(name);
     avatars[name.clone()] = json!("🦊");
-    println!("[OK] Main avatar set: {}", name);    
+    println!("[OK] Main avatar set: {}", name);
 }
 
 fn create_secondary_avatar(avatars: &mut serde_json::Value) {
@@ -123,7 +114,10 @@ fn create_secondary_avatar(avatars: &mut serde_json::Value) {
 
     avatars[name.clone()] = json!(emoji);
 
-    println!("[OK] Other avatar '{}' created with emoji '{}'", name, emoji);
+    println!(
+        "[OK] Other avatar '{}' created with emoji '{}'",
+        name, emoji
+    );
 }
 
 fn choose_emoji() -> String {

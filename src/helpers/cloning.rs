@@ -1,15 +1,13 @@
+use chrono::Utc;
+use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde_json::{Value, json};
 use uuid::Uuid;
-use chrono::Utc;
-use std::collections::HashMap;
 
 pub fn load_conversation_metadata(path: &Path) -> (String, Vec<String>) {
     let convo: Value =
-        serde_json::from_str(
-            &crate::security::io::read_text_file(path).unwrap()
-        ).unwrap();
+        serde_json::from_str(&crate::security::io::read_text_file(path).unwrap()).unwrap();
 
     let title = convo["title"].as_str().unwrap_or("Untitled").to_string();
 
@@ -45,7 +43,6 @@ pub fn clone_all_messages(id_map: &HashMap<String, String>, old_messages: &[Stri
     let messages_dir = Path::new(".fur/messages");
 
     for old_id in old_messages {
-        
         let old_msg_path = messages_dir.join(format!("{}.json", old_id));
 
         let raw = crate::security::io::read_text_file(&old_msg_path)
@@ -114,8 +111,7 @@ pub fn clone_markdown_if_any(old_msg: &Value) -> Option<String> {
             let new_filename = format!("{}{}.md", base, new_suffix);
             let new_path = format!("chats/{}", new_filename);
 
-            fs::copy(&old_md_path, &new_path)
-                .expect("❌ Failed to copy markdown file");
+            fs::copy(&old_md_path, &new_path).expect("❌ Failed to copy markdown file");
 
             return Some(new_path);
         }
@@ -139,7 +135,6 @@ fn split_clone_suffix(stem: &str) -> (String, String) {
 
     (base, suffix)
 }
-
 
 pub fn write_new_conversation(
     new_id: &str,
@@ -170,14 +165,9 @@ pub fn write_new_conversation(
 pub fn update_index(new_id: &str) {
     let index_path = Path::new(".fur/index.json");
     let mut index: Value =
-        serde_json::from_str(
-            &crate::security::io::read_text_file(&index_path).unwrap()
-        ).unwrap();
+        serde_json::from_str(&crate::security::io::read_text_file(&index_path).unwrap()).unwrap();
 
-    index["threads"]
-        .as_array_mut()
-        .unwrap()
-        .push(json!(new_id));
+    index["threads"].as_array_mut().unwrap().push(json!(new_id));
 
     index["active_thread"] = json!(new_id);
     index["current_message"] = Value::Null;

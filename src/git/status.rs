@@ -1,6 +1,6 @@
 use colored::Colorize;
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
 
 pub fn run_git_status(repo_root: &PathBuf) {
     println!("{}", "─────────────────────────────".bright_black());
@@ -22,4 +22,3 @@ pub fn run_git_status(repo_root: &PathBuf) {
         println!("{}", "❌ Failed to execute git status".red());
     }
 }
-

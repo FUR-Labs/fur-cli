@@ -1,15 +1,15 @@
+use serde_json::Value;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-use serde_json::Value;
 
 use crate::commands::timeline::TimelineArgs;
 use crate::renderer::utils::load_message;
 
 fn latex_preamble(conversation_title: &str) -> String {
     format!(
-r#"\documentclass[12pt]{{article}}
+        r#"\documentclass[12pt]{{article}}
 \usepackage[margin=1in]{{geometry}}
 \usepackage{{parskip}}
 \usepackage{{xcolor}}
@@ -48,23 +48,28 @@ fn latex_ending() -> &'static str {
 }
 
 fn strip_emojis_n_nonascii(input: &str) -> String {
-    input.chars().filter(|c| c.is_ascii() || c.is_alphanumeric() || c.is_whitespace()).collect()
+    input
+        .chars()
+        .filter(|c| c.is_ascii() || c.is_alphanumeric() || c.is_whitespace())
+        .collect()
 }
 
 pub fn render_single_message_to_tex(
     fur_dir: &Path,
     msg_id: &str,
-    label: String,        // e.g. "Root", "Root - Branch 1"
+    label: String, // e.g. "Root", "Root - Branch 1"
     args: &TimelineArgs,
     avatars: &Value,
     tex_out: &mut File,
-    depth: usize,         // branch depth
+    depth: usize, // branch depth
 ) {
-    let Some(msg) = load_message(fur_dir, msg_id, avatars) else { return };
+    let Some(msg) = load_message(fur_dir, msg_id, avatars) else {
+        return;
+    };
 
     // Escape LaTeX special characters
     let escape = |s: &str| {
-            s.replace("&", "\\&")
+        s.replace("&", "\\&")
             .replace("%", "\\%")
             .replace("$", "\\$")
             .replace("#", "\\#")
@@ -75,7 +80,6 @@ pub fn render_single_message_to_tex(
             .replace("^", "\\textasciicircum{}")
             .replace("\n", " \\\\\n")
     };
-
 
     // Handle message content safely
     let base_content = if args.verbose || args.contents {
@@ -122,7 +126,8 @@ pub fn render_single_message_to_tex(
         if att.ends_with(".png")
             || att.ends_with(".jpg")
             || att.ends_with(".jpeg")
-            || att.ends_with(".pdf")     // ✅ allow PDFs
+            || att.ends_with(".pdf")
+        // ✅ allow PDFs
         {
             full_content += &format!(
                 "\n\\begin{{center}}\\includegraphics[width=0.9\\linewidth]{{{}}}\\end{{center}}\n",
@@ -144,17 +149,23 @@ pub fn render_single_message_to_tex(
     )
     .unwrap();
 
-
     // ✅ Recurse branch-aware
     for (bi, block) in msg.branches.iter().enumerate() {
         let branch_label = format!("{} - Branch {}", label, bi + 1);
 
         for cid in block {
-            render_single_message_to_tex(fur_dir, cid, branch_label.clone(), args, avatars, tex_out, depth + 1);
+            render_single_message_to_tex(
+                fur_dir,
+                cid,
+                branch_label.clone(),
+                args,
+                avatars,
+                tex_out,
+                depth + 1,
+            );
         }
     }
 }
-
 
 pub fn export_convo_to_pdf(
     fur_dir: &Path,
@@ -168,12 +179,21 @@ pub fn export_convo_to_pdf(
     let mut file = File::create(&tex_file).expect("❌ Failed to create .tex file");
 
     // Write preamble
-    file.write_all(latex_preamble(conversation_title).as_bytes()).unwrap();
+    file.write_all(latex_preamble(conversation_title).as_bytes())
+        .unwrap();
 
     // Write messages
     for mid in root_msgs {
         if let Some(mid_str) = mid.as_str() {
-            render_single_message_to_tex(fur_dir, mid_str, "Root".to_string(), args, avatars, &mut file, 0);
+            render_single_message_to_tex(
+                fur_dir,
+                mid_str,
+                "Root".to_string(),
+                args,
+                avatars,
+                &mut file,
+                0,
+            );
         }
     }
 

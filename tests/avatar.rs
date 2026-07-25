@@ -1,23 +1,31 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
-use tempfile::tempdir;
 use std::fs;
+use tempfile::tempdir;
 
 // Helper: bootstrap a `.fur` directory in a temp folder
 fn setup_fur(tmp: &std::path::Path) {
     let fur_dir = tmp.join(".fur");
     fs::create_dir_all(&fur_dir).unwrap();
-    fs::write(fur_dir.join("avatars.json"), r#"{
+    fs::write(
+        fur_dir.join("avatars.json"),
+        r#"{
         "main": "andrew",
         "andrew": "🦊",
         "ai": "🤖"
-    }"#).unwrap();
-    fs::write(fur_dir.join("index.json"), r#"{
+    }"#,
+    )
+    .unwrap();
+    fs::write(
+        fur_dir.join("index.json"),
+        r#"{
         "threads": [],
         "active_thread": null,
         "current_message": null,
         "schema_version": "0.2"
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -27,7 +35,8 @@ fn avatar_view_lists_main_and_secondary() {
     setup_fur(tmp.path());
 
     // Run `fur avatar --view` (same as `fur avatar`)
-    Command::cargo_bin("fur").unwrap()
+    Command::cargo_bin("fur")
+        .unwrap()
         .args(&["avatar", "--view"])
         .assert()
         .success()

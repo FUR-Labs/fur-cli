@@ -1,22 +1,18 @@
-use serde_json::{json, Value};
 use chrono::Utc;
-use uuid::Uuid;
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
-use sha2::{Sha256, Digest};
+use uuid::Uuid;
 
 pub const CURRENT_SCHEMA: &str = "0.3";
-
 
 /// Upgrade a message to the current schema if needed.
 /// Returns true if the message was modified.
 pub fn upgrade_message_schema(msg: &mut Value) -> bool {
-
     let mut changed = false;
 
-    let schema = msg["schema_version"]
-        .as_str()
-        .unwrap_or("0.1");
+    let schema = msg["schema_version"].as_str().unwrap_or("0.1");
 
     if schema != CURRENT_SCHEMA {
         msg["schema_version"] = json!(CURRENT_SCHEMA);
@@ -24,15 +20,11 @@ pub fn upgrade_message_schema(msg: &mut Value) -> bool {
     }
 
     if let Some(md_path) = msg["markdown"].as_str() {
-
         if msg.get("markdown_meta").is_none() {
-
             let md = Path::new(md_path);
 
             if md.exists() {
-
                 if let Ok(bytes) = fs::read(md) {
-
                     let mut hasher = Sha256::new();
                     hasher.update(&bytes);
 
@@ -40,10 +32,7 @@ pub fn upgrade_message_schema(msg: &mut Value) -> bool {
 
                     let size = bytes.len();
 
-                    let filename = md.file_name()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
+                    let filename = md.file_name().unwrap().to_string_lossy().to_string();
 
                     msg["markdown_meta"] = json!({
                         "hash": hash,
@@ -115,17 +104,16 @@ pub fn make_message_metadata(
     img: Option<String>,
     parent: Option<String>,
 ) -> Value {
-
     let id = Uuid::new_v4().to_string();
     let timestamp = Utc::now().to_rfc3339();
 
     let markdown_meta = markdown.as_ref().and_then(|p| {
-
         let path = Path::new(p);
 
         let hash = compute_file_hash(path);
         let size = compute_file_size(path);
-        let filename = path.file_name()
+        let filename = path
+            .file_name()
             .and_then(|f| f.to_str())
             .map(|s| s.to_string());
 

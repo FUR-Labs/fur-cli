@@ -9,7 +9,7 @@ pub fn normalize_tag(raw: &str) -> String {
 
 pub fn parse_tag_list(raw: &str) -> Vec<String> {
     raw.split(',')
-       .map(|t| normalize_tag(t))
+        .map(|t| normalize_tag(t))
         .filter(|t| !t.is_empty())
         .collect()
 }

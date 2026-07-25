@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 
 use clap::Parser;
 use colored::*;
@@ -22,12 +22,11 @@ pub struct DoctorArgs {
 }
 
 pub fn run_doctor(args: DoctorArgs) {
-
     if crate::security::state::is_locked() {
         println!("🔒 Project locked. Run `fur unlock` first.");
         return;
     }
-    
+
     let fur_dir = Path::new(".fur");
 
     if !fur_dir.exists() {
@@ -42,7 +41,6 @@ pub fn run_doctor(args: DoctorArgs) {
     let mut missing: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
     for entry in fs::read_dir(&messages_dir).unwrap() {
-
         let msg_path = entry.unwrap().path();
 
         if !msg_path.is_file() {
@@ -53,9 +51,7 @@ pub fn run_doctor(args: DoctorArgs) {
         let msg: Value = serde_json::from_str(&content).unwrap();
 
         if let Some(md_path) = msg["markdown"].as_str() {
-
             if !Path::new(md_path).exists() {
-
                 missing
                     .entry(md_path.to_string())
                     .or_default()
@@ -84,7 +80,7 @@ pub fn run_doctor(args: DoctorArgs) {
     pb.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.green} {msg}")
-            .unwrap()
+            .unwrap(),
     );
 
     pb.enable_steady_tick(std::time::Duration::from_millis(120));
@@ -95,7 +91,6 @@ pub fn run_doctor(args: DoctorArgs) {
     let mut recovered_items: Vec<(String, String, usize)> = Vec::new();
 
     for (missing_path, msg_refs) in &missing {
-
         let filename = extract_filename(missing_path);
         let size = extract_size(&msg_refs[0]);
         let hash = extract_hash(&msg_refs[0]);
@@ -111,25 +106,18 @@ pub fn run_doctor(args: DoctorArgs) {
 
         let mut found_path: Option<PathBuf> = None;
 
-        fn check_candidate(
-            path: &Path,
-            filename: &str,
-            hash: &str,
-            found: &mut Option<PathBuf>
-        ) {
-
+        fn check_candidate(path: &Path, filename: &str, hash: &str, found: &mut Option<PathBuf>) {
             if !path.is_file() {
                 return;
             }
 
-            if path.file_name()
+            if path
+                .file_name()
                 .and_then(|f| f.to_str())
                 .map(|f| f == filename)
                 .unwrap_or(false)
             {
-
                 if let Ok(bytes) = fs::read(path) {
-
                     let mut hasher = Sha256::new();
                     hasher.update(&bytes);
 
@@ -143,16 +131,19 @@ pub fn run_doctor(args: DoctorArgs) {
         }
 
         for root in &search_roots {
-
             if let Ok(entries) = fs::read_dir(root) {
                 for e in entries.flatten() {
                     let path = e.path();
                     check_candidate(&path, filename, &hash, &mut found_path);
-                    if found_path.is_some() { break; }
+                    if found_path.is_some() {
+                        break;
+                    }
                 }
             }
 
-            if found_path.is_some() { break; }
+            if found_path.is_some() {
+                break;
+            }
 
             for entry in WalkDir::new(root)
                 .max_depth(if args.deep { 10 } else { 4 })
@@ -160,32 +151,27 @@ pub fn run_doctor(args: DoctorArgs) {
                 .into_iter()
                 .filter_map(|e| e.ok())
             {
-
                 let path = entry.path();
 
                 if !path.is_file() {
                     continue;
                 }
 
-                if path.file_name()
+                if path
+                    .file_name()
                     .and_then(|f| f.to_str())
                     .map(|f| f == filename)
                     .unwrap_or(false)
                 {
-
                     if let Ok(meta) = fs::metadata(path) {
-
                         if meta.len() == size {
-
                             if let Ok(bytes) = fs::read(path) {
-
                                 let mut hasher = Sha256::new();
                                 hasher.update(&bytes);
 
                                 let result = format!("{:x}", hasher.finalize());
 
                                 if result == hash {
-
                                     found_path = Some(path.to_path_buf());
                                     break;
                                 }
@@ -201,18 +187,13 @@ pub fn run_doctor(args: DoctorArgs) {
         }
 
         if let Some(found) = found_path {
-
             for msg_file in msg_refs {
-
                 let mut msg: Value =
                     serde_json::from_str(&fs::read_to_string(msg_file).unwrap()).unwrap();
 
                 msg["markdown"] = Value::String(found.to_string_lossy().to_string());
 
-                fs::write(
-                    msg_file,
-                    serde_json::to_string_pretty(&msg).unwrap()
-                ).unwrap();
+                fs::write(msg_file, serde_json::to_string_pretty(&msg).unwrap()).unwrap();
             }
 
             recovered_refs += msg_refs.len();
@@ -220,25 +201,26 @@ pub fn run_doctor(args: DoctorArgs) {
             recovered_items.push((
                 missing_path.clone(),
                 found.display().to_string(),
-                msg_refs.len()
+                msg_refs.len(),
             ));
-
         } else {
-
             unrecoverable.push(missing_path.clone());
         }
     }
 
     pb.finish_and_clear();
 
-
     if !unrecoverable.is_empty() {
-
-        println!("{}", "\nUnrecoverable attachments".bold().truecolor(255,105,180));
-        println!("{}", "-------------------------".truecolor(255,105,180));
+        println!(
+            "{}",
+            "\nUnrecoverable attachments"
+                .bold()
+                .truecolor(255, 105, 180)
+        );
+        println!("{}", "-------------------------".truecolor(255, 105, 180));
 
         for p in &unrecoverable {
-            println!("✖ {}", p.truecolor(255,105,180));
+            println!("✖ {}", p.truecolor(255, 105, 180));
         }
 
         println!();
@@ -259,39 +241,29 @@ pub fn run_doctor(args: DoctorArgs) {
     }
 
     if !recovered_items.is_empty() {
-
         println!("{}", "\nRecovered attachments".bold().green());
         println!("{}", "---------------------".green());
 
         for (orig, new, refs) in &recovered_items {
-
             println!("✔ {}", orig.green());
             println!("  → {}", new);
             println!("  ({} reference repaired)\n", refs);
         }
     }
 
-    
     if args.clean {
-
         println!("\nCleaning orphan attachment metadata...\n");
 
         for (missing_path, msg_refs) in &missing {
-
             if unrecoverable.contains(missing_path) {
-
                 for msg_file in msg_refs {
-
                     let mut msg: Value =
                         serde_json::from_str(&fs::read_to_string(msg_file).unwrap()).unwrap();
 
                     msg["markdown"] = Value::Null;
                     msg["markdown_meta"] = Value::Null;
 
-                    fs::write(
-                        msg_file,
-                        serde_json::to_string_pretty(&msg).unwrap()
-                    ).unwrap();
+                    fs::write(msg_file, serde_json::to_string_pretty(&msg).unwrap()).unwrap();
                 }
             }
         }
@@ -308,13 +280,11 @@ pub fn run_doctor(args: DoctorArgs) {
 }
 
 fn collect_roots(deep: bool) -> Vec<PathBuf> {
-
     let mut roots = Vec::new();
 
     let mut current = std::env::current_dir().unwrap();
 
     for _ in 0..4 {
-
         roots.push(current.clone());
 
         if let Some(parent) = current.parent() {
@@ -325,7 +295,6 @@ fn collect_roots(deep: bool) -> Vec<PathBuf> {
     }
 
     if deep {
-
         if let Some(home) = dirs::home_dir() {
             roots.push(home);
         }
@@ -335,17 +304,13 @@ fn collect_roots(deep: bool) -> Vec<PathBuf> {
 }
 
 fn extract_hash(msg_path: &Path) -> Option<String> {
-
     let content = fs::read_to_string(msg_path).ok()?;
     let msg: Value = serde_json::from_str(&content).ok()?;
 
-    msg["markdown_meta"]["hash"]
-        .as_str()
-        .map(|s| s.to_string())
+    msg["markdown_meta"]["hash"].as_str().map(|s| s.to_string())
 }
 
 fn extract_size(msg_path: &Path) -> Option<u64> {
-
     let content = fs::read_to_string(msg_path).ok()?;
     let msg: Value = serde_json::from_str(&content).ok()?;
 
@@ -353,6 +318,5 @@ fn extract_size(msg_path: &Path) -> Option<u64> {
 }
 
 fn extract_filename(path: &str) -> Option<&str> {
-
     Path::new(path).file_name()?.to_str()
 }

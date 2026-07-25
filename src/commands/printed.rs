@@ -1,8 +1,8 @@
+use crate::commands::timeline::{run_timeline, TimelineArgs};
+use colored::*;
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
-use colored::*;
-use crate::commands::timeline::{run_timeline, TimelineArgs};
 
 /// `fur printed` — exports the active conversation to Markdown or PDF
 pub fn run_printed(out: Option<String>, verbose: bool) {
@@ -43,7 +43,6 @@ pub fn run_printed(out: Option<String>, verbose: bool) {
             format!("{}_{}.md", all_caps, short_id)
         }
     };
-
 
     // --- Auto-detect output type ---
     let lower_out = out_path.to_lowercase();

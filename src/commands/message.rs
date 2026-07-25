@@ -1,9 +1,9 @@
-use clap::Parser;
-use serde_json::{Value, json};
-use std::fs;
-use std::io::{Write};
-use std::path::Path;
 use crate::helpers::insertion::run_insert;
+use clap::Parser;
+use serde_json::{json, Value};
+use std::fs;
+use std::io::Write;
+use std::path::Path;
 
 /// Subcommand: `fur msg`
 #[derive(Parser, Debug)]
@@ -11,7 +11,6 @@ pub struct MsgArgs {
     /// First positional: ID prefix (only if it matches) or text
     #[arg(index = 1)]
     pub id_prefix: Option<String>,
-
 
     /// Insert before target
     #[arg(long)]
@@ -24,10 +23,10 @@ pub struct MsgArgs {
     #[arg(long)]
     pub edit: bool,
 
-    #[arg(long, alias="rem")]
+    #[arg(long, alias = "rem")]
     pub delete: bool,
 
-    #[arg(long, alias="file")]
+    #[arg(long, alias = "file")]
     pub file: Option<String>,
 
     #[arg(long)]
@@ -39,13 +38,10 @@ pub struct MsgArgs {
     /// Everything *after* the ID
     #[arg(index = 2, trailing_var_arg = true)]
     pub rest: Vec<String>,
-
 }
-
 
 /// Entry point
 pub fn run_msg(args: MsgArgs) {
-
     if args.delete {
         return run_delete(args);
     }
@@ -67,9 +63,6 @@ pub fn run_msg(args: MsgArgs) {
     eprintln!("❌ msg requires: --pre | --post | --edit | --delete");
 }
 
-
-
-
 //
 // ======================================================
 //  DELETE LOGIC
@@ -78,8 +71,7 @@ pub fn run_msg(args: MsgArgs) {
 
 fn run_delete(args: MsgArgs) {
     // Delete target: ID prefix OR last message
-    let target = detect_id(&args.id_prefix)
-        .unwrap_or_else(|| resolve_target_message(None));
+    let target = detect_id(&args.id_prefix).unwrap_or_else(|| resolve_target_message(None));
 
     print!("Delete message {}? [y/N]: ", &target[..8]);
     std::io::stdout().flush().unwrap();
@@ -87,7 +79,7 @@ fn run_delete(args: MsgArgs) {
     let mut buf = String::new();
     std::io::stdin().read_line(&mut buf).unwrap();
 
-    if !["y","Y","yes","YES"].contains(&buf.trim()) {
+    if !["y", "Y", "yes", "YES"].contains(&buf.trim()) {
         println!("❌ Cancelled.");
         return;
     }
@@ -114,8 +106,7 @@ fn run_edit(args: MsgArgs) {
     let fur = Path::new(".fur");
     let msg_path = fur.join("messages").join(format!("{}.json", id));
 
-    let mut msg: Value =
-        serde_json::from_str(&fs::read_to_string(&msg_path).unwrap()).unwrap();
+    let mut msg: Value = serde_json::from_str(&fs::read_to_string(&msg_path).unwrap()).unwrap();
 
     // Interactive override
     if args.interactive {
@@ -145,8 +136,6 @@ fn run_edit(args: MsgArgs) {
     println!("✏️ Edited {}", &id[..8]);
 }
 
-
-
 //
 // ======================================================
 //  POSITONAL ID RESOLUTION
@@ -163,7 +152,6 @@ pub fn detect_id(x: &Option<String>) -> Option<String> {
 
     resolve_prefix_if_exists(val)
 }
-
 
 /// Determine if the call looked like:
 ///   msg <id> --edit new text...
@@ -205,8 +193,7 @@ fn resolve_prefix_if_exists(pfx: &str) -> Option<String> {
     let (_index, tid) = resolve_active_conversation();
 
     let convo_path = fur.join("threads").join(format!("{}.json", tid));
-    let convo: Value =
-        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
+    let convo: Value = serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
     let root_ids = convo["messages"]
         .as_array()
@@ -215,8 +202,7 @@ fn resolve_prefix_if_exists(pfx: &str) -> Option<String> {
         .filter_map(|x| x.as_str().map(|s| s.to_string()))
         .collect::<Vec<_>>();
 
-    let matches: Vec<&String> =
-        root_ids.iter().filter(|id| id.starts_with(pfx)).collect();
+    let matches: Vec<&String> = root_ids.iter().filter(|id| id.starts_with(pfx)).collect();
 
     if matches.len() == 1 {
         Some(matches[0].clone())
@@ -233,8 +219,7 @@ fn resolve_prefix_if_exists(pfx: &str) -> Option<String> {
 
 fn resolve_active_conversation() -> (Value, String) {
     let idx_path = Path::new(".fur/index.json");
-    let index: Value =
-        serde_json::from_str(&fs::read_to_string(idx_path).unwrap()).unwrap();
+    let index: Value = serde_json::from_str(&fs::read_to_string(idx_path).unwrap()).unwrap();
 
     let tid = index["active_thread"].as_str().unwrap_or("").to_string();
 
@@ -247,8 +232,7 @@ pub fn resolve_target_message(prefix: Option<String>) -> String {
     let (index, tid) = resolve_active_conversation();
     let convo_path = fur.join("threads").join(format!("{}.json", tid));
 
-    let convo: Value =
-        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
+    let convo: Value = serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
     let root_ids = convo["messages"]
         .as_array()
@@ -271,8 +255,10 @@ pub fn resolve_target_message(prefix: Option<String>) -> String {
 }
 
 fn resolve_prefix(root_ids: &Vec<String>, prefix: &str) -> String {
-    let matches: Vec<&String> =
-        root_ids.iter().filter(|id| id.starts_with(prefix)).collect();
+    let matches: Vec<&String> = root_ids
+        .iter()
+        .filter(|id| id.starts_with(prefix))
+        .collect();
 
     if matches.is_empty() {
         eprintln!("❌ No message matches '{}'", prefix);
@@ -296,8 +282,12 @@ fn recursive_delete(mid: &str) {
     let fur = Path::new(".fur");
     let msg_path = fur.join("messages").join(format!("{}.json", mid));
 
-    let Ok(content) = fs::read_to_string(&msg_path) else { return };
-    let Ok(msg) = serde_json::from_str::<Value>(&content) else { return };
+    let Ok(content) = fs::read_to_string(&msg_path) else {
+        return;
+    };
+    let Ok(msg) = serde_json::from_str::<Value>(&content) else {
+        return;
+    };
 
     if let Some(children) = msg["children"].as_array() {
         for child in children {
@@ -335,8 +325,7 @@ fn remove_from_parent_or_root(mid: &str) {
     let (_index, tid) = resolve_active_conversation();
     let convo_path = fur.join("threads").join(format!("{}.json", tid));
 
-    let mut convo: Value =
-        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
+    let mut convo: Value = serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
     if let Some(arr) = convo["messages"].as_array_mut() {
         arr.retain(|v| v.as_str() != Some(mid));
@@ -349,8 +338,7 @@ fn update_current_after_delete(mid: &str) {
     let fur = Path::new(".fur");
     let idx_path = fur.join("index.json");
 
-    let mut index: Value =
-        serde_json::from_str(&fs::read_to_string(&idx_path).unwrap()).unwrap();
+    let mut index: Value = serde_json::from_str(&fs::read_to_string(&idx_path).unwrap()).unwrap();
 
     if let Some(cur) = index["current_message"].as_str() {
         if cur == mid {
@@ -368,8 +356,8 @@ fn update_current_after_delete(mid: &str) {
 //
 
 fn run_interactive_editor(initial: &str) -> String {
-    use std::process::Command;
     use std::env;
+    use std::process::Command;
 
     let tmp = "/tmp/fur_edit_msg.txt";
     fs::write(tmp, initial).unwrap();

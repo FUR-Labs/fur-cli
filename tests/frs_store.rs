@@ -1,6 +1,6 @@
+use fur_cli::commands::run::run_frs;
 use std::fs;
 use tempfile::tempdir;
-use fur_cli::commands::run::run_frs;
 
 #[test]
 fn run_double_store_ignores_second() {
@@ -9,12 +9,16 @@ fn run_double_store_ignores_second() {
 
     std::fs::create_dir_all(tmp.path().join(".fur/threads")).unwrap();
     std::fs::create_dir_all(tmp.path().join(".fur/messages")).unwrap();
-    std::fs::write(tmp.path().join(".fur/index.json"), r#"{
+    std::fs::write(
+        tmp.path().join(".fur/index.json"),
+        r#"{
         "threads": [],
         "active_thread": null,
         "current_message": null,
         "schema_version": "0.2"
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     fs::write(".fur/avatars.json", r#"{"main":"ai"}"#).unwrap();
 
     let script = r#"
@@ -33,4 +37,3 @@ fn run_double_store_ignores_second() {
     // Just assert files exist, not exact JSON
     assert!(fs::read_dir(".fur/threads").unwrap().count() == 1);
 }
-

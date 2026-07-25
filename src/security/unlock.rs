@@ -4,7 +4,7 @@ use std::path::Path;
 use clap::Parser;
 use rpassword::read_password;
 
-use crate::security::{io, crypto, state};
+use crate::security::{crypto, io, state};
 
 #[derive(Parser, Clone)]
 pub struct UnlockArgs {
@@ -13,7 +13,6 @@ pub struct UnlockArgs {
 }
 
 pub fn run_unlock(args: UnlockArgs) {
-
     if !state::is_locked() {
         println!("🔓 Project already unlocked.");
         return;
@@ -39,7 +38,6 @@ pub fn run_unlock(args: UnlockArgs) {
 }
 
 fn verify_password(password: &str) -> bool {
-
     let check_path = Path::new(".fur/.lockcheck");
 
     let bytes = match std::fs::read(check_path) {
@@ -59,7 +57,6 @@ fn verify_password(password: &str) -> bool {
 }
 
 fn decrypt_project(password: &str) {
-
     decrypt_dir(".fur/messages", password);
     decrypt_dir(".fur/threads", password);
 
@@ -70,13 +67,10 @@ fn decrypt_project(password: &str) {
 }
 
 fn decrypt_dir(dir: &str, password: &str) {
-
     let path = Path::new(dir);
 
     if let Ok(entries) = fs::read_dir(path) {
-
         for e in entries.flatten() {
-
             let p = e.path();
 
             if p.is_file() {
@@ -87,7 +81,6 @@ fn decrypt_dir(dir: &str, password: &str) {
 }
 
 fn decrypt_file(path: &str, password: &str) {
-
     let p = Path::new(path);
 
     if p.exists() {
@@ -96,7 +89,6 @@ fn decrypt_file(path: &str, password: &str) {
 }
 
 fn decrypt_markdowns(password: &str) {
-
     let chats = Path::new("chats");
 
     if !chats.exists() {
@@ -104,9 +96,7 @@ fn decrypt_markdowns(password: &str) {
     }
 
     if let Ok(entries) = fs::read_dir(chats) {
-
         for e in entries.flatten() {
-
             let p = e.path();
 
             if p.is_file() {

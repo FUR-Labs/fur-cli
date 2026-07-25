@@ -1,11 +1,11 @@
+use chrono::{DateTime, Local};
+use clap::Parser;
+use colored::*;
+use dirs;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
-use chrono::{DateTime, Local};
-use serde_json::{Value, json};
-use clap::Parser;
 use walkdir::WalkDir;
-use dirs;
-use colored::*;
 
 /// Arguments for `fur sweep`
 #[derive(Parser)]
@@ -28,7 +28,8 @@ pub struct SweepArgs {
 }
 
 pub fn run_sweep(args: SweepArgs) {
-    let start_dir = args.dir
+    let start_dir = args
+        .dir
         .clone()
         .map(PathBuf::from)
         .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from("/")));
@@ -52,17 +53,22 @@ pub fn run_sweep(args: SweepArgs) {
                             .cloned()
                             .unwrap_or_else(|| Vec::new());
                         let active = json["active_thread"].as_str().unwrap_or("-");
-                        let msg_count = threads_vec.iter().filter_map(|tid| {
-                            tid.as_str().map(|t| {
-                                let tp = path.join("threads").join(format!("{}.json", t));
-                                if let Ok(tc) = fs::read_to_string(tp) {
-                                    serde_json::from_str::<Value>(&tc)
-                                        .ok()
-                                        .and_then(|v| v["messages"].as_array().map(|a| a.len()))
-                                        .unwrap_or(0)
-                                } else { 0 }
+                        let msg_count = threads_vec
+                            .iter()
+                            .filter_map(|tid| {
+                                tid.as_str().map(|t| {
+                                    let tp = path.join("threads").join(format!("{}.json", t));
+                                    if let Ok(tc) = fs::read_to_string(tp) {
+                                        serde_json::from_str::<Value>(&tc)
+                                            .ok()
+                                            .and_then(|v| v["messages"].as_array().map(|a| a.len()))
+                                            .unwrap_or(0)
+                                    } else {
+                                        0
+                                    }
+                                })
                             })
-                        }).sum::<usize>();
+                            .sum::<usize>();
 
                         let modified = fs::metadata(&index_path)
                             .and_then(|m| m.modified())
@@ -124,13 +130,23 @@ pub fn run_sweep(args: SweepArgs) {
         println!(
             "🌍  Found {} {} | {} {} | {} {}\n",
             total_projects.to_string().bold().bright_yellow(),
-            if total_projects == 1 { "project" } else { "projects" },
+            if total_projects == 1 {
+                "project"
+            } else {
+                "projects"
+            },
             total_threads.to_string().bold().green(),
-            if total_threads == 1 { "conversation" } else { "threads" },
+            if total_threads == 1 {
+                "conversation"
+            } else {
+                "threads"
+            },
             total_messages.to_string().bold().blue(),
-            if total_messages == 1 { "message" } else { "messages" },
+            if total_messages == 1 {
+                "message"
+            } else {
+                "messages"
+            },
         );
     }
 }
-
-

@@ -16,4 +16,3 @@ pub fn find_git_root() -> Option<PathBuf> {
 
     None
 }
-

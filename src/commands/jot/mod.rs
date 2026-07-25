@@ -2,9 +2,9 @@ mod core;
 
 pub use core::upgrade_message_schema;
 
+use self::core::*;
 use clap::Parser;
 use serde_json::Value;
-use self::core::*;
 
 #[derive(Parser, Debug)]
 pub struct JotArgs {
@@ -33,9 +33,7 @@ pub struct JotArgs {
     pub parent: Option<String>,
 }
 
-
 pub fn run_jot(args: JotArgs) {
-
     let ctx = match load_context() {
         Ok(c) => c,
         Err(e) => return eprintln!("{}", e),
@@ -56,22 +54,15 @@ pub fn run_jot(args: JotArgs) {
     );
     let msg_id = msg["id"].as_str().unwrap().to_string();
 
-    apply_jot_effects(
-        &ctx,
-        &msg,
-        &msg_id,
-        args.parent.as_deref(),
-        &avatar
-    );
+    apply_jot_effects(&ctx, &msg, &msg_id, args.parent.as_deref(), &avatar);
 }
-
 
 pub fn apply_jot_effects(
     ctx: &FurContext,
     msg: &Value,
     msg_id: &str,
     parent: Option<&str>,
-    avatar: &str
+    avatar: &str,
 ) {
     save_message(&ctx.fur_dir, msg_id, msg);
     update_conversation(ctx, msg_id, parent);

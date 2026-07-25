@@ -1,7 +1,7 @@
+use colored::*;
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
-use colored::*;
 
 use crate::commands::timeline::TimelineArgs;
 use crate::renderer::utils::load_message;
@@ -13,8 +13,10 @@ pub fn render_message(
     args: &TimelineArgs,
     avatars: &Value,
 ) {
-    let Some(msg) = load_message(fur_dir, msg_id, avatars) else { return };
-    
+    let Some(msg) = load_message(fur_dir, msg_id, avatars) else {
+        return;
+    };
+
     if let Some(att) = msg.attachment {
         println!("{}🖼️ [Attachment: {}]\n", " ".repeat(4), att);
     }

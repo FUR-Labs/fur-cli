@@ -1,11 +1,14 @@
-use std::fs;
-use std::path::{Path};
-use serde_json::{Value, json};
-use clap::Parser;
-use chrono::{DateTime, Local, Utc};
-use crate::helpers::conversation::{resolve_target_thread_id,confirm_delete_primary,confirm_delete_destructive, perform_conversation_deletion};
-use crate::renderer::table::render_table;
+use crate::helpers::conversation::{
+    confirm_delete_destructive, confirm_delete_primary, perform_conversation_deletion,
+    resolve_target_thread_id,
+};
 use crate::helpers::tags::parse_tag_list;
+use crate::renderer::table::render_table;
+use chrono::{DateTime, Local, Utc};
+use clap::Parser;
+use serde_json::{json, Value};
+use std::fs;
+use std::path::Path;
 
 /// Arguments for the `conversation` command
 #[derive(Parser)]
@@ -50,8 +53,7 @@ pub fn run_conversation(args: ThreadArgs) {
         return;
     }
 
-    let mut index: Value =
-        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+    let mut index: Value = serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
 
     if args.tag.is_some() || args.untag.is_some() || args.clear_tags {
         return handle_tagging(&args, &mut index, fur_dir);
@@ -74,11 +76,7 @@ pub fn run_conversation(args: ThreadArgs) {
     }
 }
 
-fn handle_rename_thread(
-    index: &mut Value,
-    fur_dir: &Path,
-    args: &ThreadArgs,
-) {
+fn handle_rename_thread(index: &mut Value, fur_dir: &Path, args: &ThreadArgs) {
     let new_title = match &args.rename {
         Some(t) => t,
         None => return,
@@ -115,15 +113,24 @@ fn handle_rename_thread(
         found[0].to_string()
     };
 
-    let convo_path = fur_dir.join("threads").join(format!("{}.json", target_thread_id));
+    let convo_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", target_thread_id));
     let mut conversation_json: Value =
         serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
-    let old_title = conversation_json["title"].as_str().unwrap_or("Untitled").to_string();
+    let old_title = conversation_json["title"]
+        .as_str()
+        .unwrap_or("Untitled")
+        .to_string();
 
     // Update title
     conversation_json["title"] = Value::String(new_title.to_string());
-    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_json).unwrap()).unwrap();
+    fs::write(
+        &convo_path,
+        serde_json::to_string_pretty(&conversation_json).unwrap(),
+    )
+    .unwrap();
 
     println!(
         "✏️  Renamed conversation {} \"{}\" → \"{}\"",
@@ -133,12 +140,7 @@ fn handle_rename_thread(
     );
 }
 
-
-fn handle_delete_thread(
-    index: &mut Value,
-    fur_dir: &Path,
-    args: &ThreadArgs,
-) {
+fn handle_delete_thread(index: &mut Value, fur_dir: &Path, args: &ThreadArgs) {
     let target_tid = match resolve_target_thread_id(index, args) {
         Some(tid) => tid,
         None => return,
@@ -166,13 +168,7 @@ fn handle_delete_thread(
     perform_conversation_deletion(index, fur_dir, &target_tid, &threads);
 }
 
-
-
-fn handle_view_threads(
-    index: &Value,
-    fur_dir: &Path,
-    args: &ThreadArgs,
-) {
+fn handle_view_threads(index: &Value, fur_dir: &Path, args: &ThreadArgs) {
     if !(args.view || args.id.is_none()) {
         return;
     }
@@ -267,9 +263,7 @@ fn handle_view_threads(
 
         // Recalculate active_idx inside truncated rows
         let active_prefix = &active[..8];
-        active_idx = rows
-            .iter()
-            .position(|row| row[0] == active_prefix);
+        active_idx = rows.iter().position(|row| row[0] == active_prefix);
     }
 
     // UPDATED HEADERS: now includes TAGS
@@ -285,12 +279,14 @@ fn handle_view_threads(
 }
 
 fn truncate_around_active(rows: Vec<Vec<String>>, active_idx: Option<usize>) -> Vec<Vec<String>> {
-    if active_idx.is_none() { return rows; }
+    if active_idx.is_none() {
+        return rows;
+    }
     let i = active_idx.unwrap();
     let win = 3;
 
     let start = i.saturating_sub(win);
-    let end   = (i + win).min(rows.len() - 1);
+    let end = (i + win).min(rows.len() - 1);
 
     let mut out = Vec::new();
 
@@ -309,12 +305,7 @@ fn truncate_around_active(rows: Vec<Vec<String>>, active_idx: Option<usize>) -> 
     out
 }
 
-fn handle_switch_thread(
-    index: &mut Value,
-    index_path: &Path,
-    fur_dir: &Path,
-    args: &ThreadArgs,
-) {
+fn handle_switch_thread(index: &mut Value, index_path: &Path, fur_dir: &Path, args: &ThreadArgs) {
     let tid = match &args.id {
         Some(id) => id,
         None => return,
@@ -331,8 +322,7 @@ fn handle_switch_thread(
     let mut found = threads.iter().find(|&s| s == tid);
 
     if found.is_none() {
-        let matches: Vec<&String> =
-            threads.iter().filter(|s| s.starts_with(tid)).collect();
+        let matches: Vec<&String> = threads.iter().filter(|s| s.starts_with(tid)).collect();
 
         if matches.len() == 1 {
             found = Some(matches[0]);
@@ -367,11 +357,7 @@ fn handle_switch_thread(
     );
 }
 
-fn handle_tagging(
-    args: &ThreadArgs,
-    index: &mut Value,
-    fur_dir: &Path,
-) {
+fn handle_tagging(args: &ThreadArgs, index: &mut Value, fur_dir: &Path) {
     let empty_vec: Vec<Value> = Vec::new();
     let threads: Vec<String> = index["threads"]
         .as_array()
@@ -382,8 +368,10 @@ fn handle_tagging(
 
     // Determine which conversation to operate on
     let target_tid = if let Some(prefix) = &args.id {
-        let matches: Vec<&String> =
-            threads.iter().filter(|tid| tid.starts_with(prefix)).collect();
+        let matches: Vec<&String> = threads
+            .iter()
+            .filter(|tid| tid.starts_with(prefix))
+            .collect();
 
         if matches.is_empty() {
             eprintln!("❌ No conversation matches '{}'", prefix);
@@ -399,8 +387,7 @@ fn handle_tagging(
     };
 
     let convo_path = fur_dir.join("threads").join(format!("{}.json", target_tid));
-    let mut convo: Value =
-        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
+    let mut convo: Value = serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
     // -------------------------------
     // CLEAR ALL TAGS
@@ -460,11 +447,7 @@ fn handle_tagging(
 }
 
 /// Computes total storage: conversation.json + all message JSONs + all markdown attachments.
-fn compute_conversation_size(
-    fur_dir: &Path,
-    tid: &str,
-    msg_ids: &[String],
-) -> u64 {
+fn compute_conversation_size(fur_dir: &Path, tid: &str, msg_ids: &[String]) -> u64 {
     let mut total: u64 = 0;
 
     // Add main conversation JSON
@@ -487,9 +470,7 @@ fn get_message_file_sizes(fur_dir: &Path, msg_ids: &[String]) -> u64 {
         // Parse JSON to find ONLY message["markdown"]
         if let Ok(content) = fs::read_to_string(&msg_path) {
             if let Ok(json) = serde_json::from_str::<Value>(&content) {
-
                 if let Some(md_raw) = json["markdown"].as_str() {
-
                     // CASE 1: absolute path -> use as-is
                     let md_path = Path::new(md_raw);
                     if md_path.is_absolute() {

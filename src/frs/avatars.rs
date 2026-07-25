@@ -1,7 +1,7 @@
+use rand::prelude::IndexedRandom;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::Path;
-use rand::prelude::IndexedRandom;
 
 pub fn load_avatars() -> Value {
     let path = Path::new(".fur/avatars.json");
@@ -27,7 +27,8 @@ pub fn resolve_avatar(avatars: &Value, key: &str) -> (String, String) {
     }
 
     // If key looks like an emoji already → reverse-lookup name
-    if let Some((name, _)) = avatars.as_object()
+    if let Some((name, _)) = avatars
+        .as_object()
         .and_then(|map| map.iter().find(|(_, v)| v.as_str() == Some(key)))
     {
         return (name.clone(), key.to_string());
@@ -35,7 +36,6 @@ pub fn resolve_avatar(avatars: &Value, key: &str) -> (String, String) {
 
     (key.to_string(), "🐾".to_string()) // fallback
 }
-
 
 /// Return true if the name clearly looks like a bot/LLM.
 fn is_bot_name(name: &str) -> bool {
@@ -71,4 +71,3 @@ pub fn get_random_emoji_for_name(name: &str) -> String {
     let pool = ["👤"];
     pool.choose(&mut rand::rng()).unwrap_or(&"👔").to_string()
 }
-

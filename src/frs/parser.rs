@@ -1,7 +1,7 @@
+use crate::frs::ast::{Command, Message, ScriptItem, Thread};
+use crate::frs::avatars::load_avatars;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::frs::ast::{Thread, Message, ScriptItem, Command};
-use crate::frs::avatars::load_avatars;
 
 /// Pure parser: read .frs into a Thread struct
 pub fn parse_frs(path: &str) -> Thread {
@@ -25,9 +25,8 @@ pub fn parse_frs(path: &str) -> Thread {
         }
         let line = &lines[i];
         if line.starts_with("new ") {
-            break extract_quoted(line).unwrap_or_else(|| {
-                panic!("❌ Could not parse conversation title from: {}", line)
-            });
+            break extract_quoted(line)
+                .unwrap_or_else(|| panic!("❌ Could not parse conversation title from: {}", line));
         }
         i += 1;
     };
@@ -239,8 +238,7 @@ fn make_message(
 }
 
 fn parse_text_jot(lines: &[String], i: &mut usize, avatar: &str) -> Option<Message> {
-    collect_multiline_quoted(lines, i)
-        .map(|text| make_message(avatar, Some(text), None, None))
+    collect_multiline_quoted(lines, i).map(|text| make_message(avatar, Some(text), None, None))
 }
 
 fn parse_file_jot(line: &str, avatar: &str, frs_dir: &Path) -> Option<Message> {
@@ -321,7 +319,7 @@ fn parse_jot_line(
 
 fn extract_quoted(line: &str) -> Option<String> {
     let start = line.find('"')?;
-    let end = line[start + 1..].find('"')? + start +1;
+    let end = line[start + 1..].find('"')? + start + 1;
     Some(line[start + 1..end].to_string())
 }
 
@@ -337,5 +335,9 @@ fn parse_command_line(line: &str, line_number: usize) -> Command {
     let mut parts = line.split_whitespace();
     let name = parts.next().unwrap_or("").to_string();
     let args = parts.map(|s| s.to_string()).collect();
-    Command { name, args, line_number }
+    Command {
+        name,
+        args,
+        line_number,
+    }
 }

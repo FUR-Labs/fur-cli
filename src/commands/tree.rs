@@ -1,10 +1,10 @@
+use crate::frs::avatars::resolve_avatar;
+use clap::Parser;
+use colored::*;
+use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
-use clap::Parser;
-use std::collections::HashMap;
-use crate::frs::avatars::resolve_avatar;
-use colored::*;
 
 #[derive(Parser, Clone)]
 pub struct TreeArgs {
@@ -17,38 +17,48 @@ pub fn run_tree(args: TreeArgs) {
     let index_path = fur_dir.join("index.json");
 
     if !index_path.exists() {
-        eprintln!("{}", "🚨 .fur/ not found. Run `fur new` first.".red().bold());
+        eprintln!(
+            "{}",
+            "🚨 .fur/ not found. Run `fur new` first.".red().bold()
+        );
         return;
     }
 
     // Load index and conversation
-    let index_data: Value =
-        serde_json::from_str(
-            &crate::security::io::read_text_file(&index_path)
-                .expect("❌ Project locked. Run `fur unlock`.")
-        ).unwrap();
+    let index_data: Value = serde_json::from_str(
+        &crate::security::io::read_text_file(&index_path)
+            .expect("❌ Project locked. Run `fur unlock`."),
+    )
+    .unwrap();
 
     let conversation_id = if let Some(ref override_id) = args.conversation_override {
         override_id
     } else {
         index_data["active_thread"].as_str().unwrap_or("")
     };
-    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    let conversation_data: Value =
-        serde_json::from_str(
-            &crate::security::io::read_text_file(&convo_path)
-                .expect("❌ Project locked. Run `fur unlock`.")
-        ).unwrap();
+    let convo_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", conversation_id));
+    let conversation_data: Value = serde_json::from_str(
+        &crate::security::io::read_text_file(&convo_path)
+            .expect("❌ Project locked. Run `fur unlock`."),
+    )
+    .unwrap();
 
     // Load avatars.json once
     let avatars: Value = serde_json::from_str(
-        &fs::read_to_string(fur_dir.join("avatars.json")).unwrap_or_else(|_| "{}".to_string())
-    ).unwrap_or(serde_json::json!({}));
+        &fs::read_to_string(fur_dir.join("avatars.json")).unwrap_or_else(|_| "{}".to_string()),
+    )
+    .unwrap_or(serde_json::json!({}));
 
     println!(
         "{} {}",
         "🌳 Conversation Tree:".bold().cyan(),
-        conversation_data["title"].as_str().unwrap_or("Untitled").green().bold()
+        conversation_data["title"]
+            .as_str()
+            .unwrap_or("Untitled")
+            .green()
+            .bold()
     );
 
     if let Some(messages) = conversation_data["messages"].as_array() {
@@ -99,7 +109,6 @@ fn load_conversation_messages(fur_dir: &Path, conversation: &Value) -> HashMap<S
     }
     id_to_message
 }
-
 
 fn render_message(
     id_to_message: &HashMap<String, Value>,
@@ -161,7 +170,13 @@ fn render_message(
                                 prefix,
                                 if is_last { "    " } else { "│  " }.bright_green()
                             );
-                            render_message(id_to_message, cid, &new_prefix, i == arr.len() - 1, avatars);
+                            render_message(
+                                id_to_message,
+                                cid,
+                                &new_prefix,
+                                i == arr.len() - 1,
+                                avatars,
+                            );
                         }
                     }
                 }
@@ -174,7 +189,13 @@ fn render_message(
                         prefix,
                         if is_last { "    " } else { "│  " }.bright_green()
                     );
-                    render_message(id_to_message, cid, &new_prefix, i == children.len() - 1, avatars);
+                    render_message(
+                        id_to_message,
+                        cid,
+                        &new_prefix,
+                        i == children.len() - 1,
+                        avatars,
+                    );
                 }
             }
         }

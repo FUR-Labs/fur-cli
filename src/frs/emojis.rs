@@ -16,9 +16,6 @@ pub fn preview_emojis(count: usize) {
 pub fn search_emojis(keyword: &str) -> Vec<&'static emojis::Emoji> {
     let kw = keyword.to_lowercase();
     emojis::iter()
-        .filter(|e| {
-            e.name().contains(&kw)
-                || e.shortcodes().any(|s| s.contains(&kw))
-        })
+        .filter(|e| e.name().contains(&kw) || e.shortcodes().any(|s| s.contains(&kw)))
         .collect()
 }

@@ -1,7 +1,7 @@
 use clap::Parser;
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
 
 /// Arguments for the `save` subcommand
 #[derive(Parser)]
@@ -33,17 +33,18 @@ pub fn run_save(args: SaveArgs) {
         }
     };
 
-    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    let conversation: Value =
-        serde_json::from_str(&fs::read_to_string(&convo_path).expect("❌ Cannot read conversation"))
-            .unwrap();
+    let convo_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", conversation_id));
+    let conversation: Value = serde_json::from_str(
+        &fs::read_to_string(&convo_path).expect("❌ Cannot read conversation"),
+    )
+    .unwrap();
 
     let title = conversation["title"].as_str().unwrap_or("Untitled");
     let safe_title = title.replace(" ", "_");
 
-    let output_path = args
-        .out
-        .unwrap_or_else(|| format!("{}.frs", safe_title));
+    let output_path = args.out.unwrap_or_else(|| format!("{}.frs", safe_title));
 
     let mut out = String::new();
 

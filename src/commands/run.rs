@@ -1,9 +1,9 @@
-use std::fs;
-use colored::*;
-use crate::frs::{parser, persist_frs};
-use crate::commands::{timeline, tree};
 use crate::commands::timeline::TimelineArgs;
 use crate::commands::tree::TreeArgs;
+use crate::commands::{timeline, tree};
+use crate::frs::{parser, persist_frs};
+use colored::*;
+use std::fs;
 
 /// Run an .frs script:
 /// - Parse into Thread (in-memory)
@@ -33,9 +33,12 @@ pub fn run_frs(path: &str) {
             } else {
                 eprintln!(
                     "{}",
-                    format!("⚠️ Ignoring extra `store` at line {} — already persisted", lineno + 1)
-                        .yellow()
-                        .bold()
+                    format!(
+                        "⚠️ Ignoring extra `store` at line {} — already persisted",
+                        lineno + 1
+                    )
+                    .yellow()
+                    .bold()
                 );
             }
             continue;
@@ -103,7 +106,11 @@ pub fn run_frs(path: &str) {
 
                 if let Some(tid) = &tid_override {
                     index_json["active_thread"] = tid.clone().into();
-                    std::fs::write(&index_path, serde_json::to_string_pretty(&index_json).unwrap()).unwrap();
+                    std::fs::write(
+                        &index_path,
+                        serde_json::to_string_pretty(&index_json).unwrap(),
+                    )
+                    .unwrap();
                 }
 
                 // Now run printed, which will read this modified active_thread
@@ -112,17 +119,22 @@ pub fn run_frs(path: &str) {
                 // Restore original active_thread
                 if let Some(orig) = original_active {
                     index_json["active_thread"] = orig.into();
-                    std::fs::write(&index_path, serde_json::to_string_pretty(&index_json).unwrap()).unwrap();
+                    std::fs::write(
+                        &index_path,
+                        serde_json::to_string_pretty(&index_json).unwrap(),
+                    )
+                    .unwrap();
                 }
             });
 
             continue;
         }
 
-
         // --- Tree
         if line.starts_with("tree") {
-            let args = TreeArgs { conversation_override: None };
+            let args = TreeArgs {
+                conversation_override: None,
+            };
             with_ephemeral(stored, &conversation, |tid_override| {
                 let mut args = args.clone();
                 args.conversation_override = tid_override;
@@ -135,7 +147,10 @@ pub fn run_frs(path: &str) {
     }
 
     if !stored {
-        eprintln!("{}", "⚠️ Script finished without a `store` — nothing persisted.".yellow());
+        eprintln!(
+            "{}",
+            "⚠️ Script finished without a `store` — nothing persisted.".yellow()
+        );
     }
 }
 

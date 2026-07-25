@@ -13,7 +13,6 @@ pub struct LockArgs {
 }
 
 pub fn run_lock(args: LockArgs) {
-
     if state::is_locked() {
         println!("🔒 Project already locked.");
         return;
@@ -41,7 +40,6 @@ fn create_lockcheck() {
 }
 
 fn encrypt_project(password: &str) {
-
     encrypt_dir(".fur/messages", password);
     encrypt_dir(".fur/threads", password);
 
@@ -52,13 +50,10 @@ fn encrypt_project(password: &str) {
 }
 
 fn encrypt_dir(dir: &str, password: &str) {
-
     let path = Path::new(dir);
 
     if let Ok(entries) = fs::read_dir(path) {
-
         for e in entries.flatten() {
-
             let p = e.path();
 
             if p.is_file() {
@@ -69,7 +64,6 @@ fn encrypt_dir(dir: &str, password: &str) {
 }
 
 fn encrypt_file(path: &str, password: &str) {
-
     let p = Path::new(path);
 
     if p.exists() {
@@ -78,7 +72,6 @@ fn encrypt_file(path: &str, password: &str) {
 }
 
 fn encrypt_markdowns(password: &str) {
-
     let chats = Path::new("chats");
 
     if !chats.exists() {
@@ -86,9 +79,7 @@ fn encrypt_markdowns(password: &str) {
     }
 
     if let Ok(entries) = fs::read_dir(chats) {
-
         for e in entries.flatten() {
-
             let p = e.path();
 
             if p.is_file() {

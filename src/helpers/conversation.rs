@@ -1,14 +1,11 @@
-use std::fs;
-use std::path::{Path};
-use serde_json::{Value, json};
-use std::io::{self, Write};
 use crate::commands::conversation::ThreadArgs;
 use colored::*;
+use serde_json::{json, Value};
+use std::fs;
+use std::io::{self, Write};
+use std::path::Path;
 
-pub fn resolve_target_thread_id(
-    index: &Value,
-    args: &ThreadArgs,
-) -> Option<String> {
+pub fn resolve_target_thread_id(index: &Value, args: &ThreadArgs) -> Option<String> {
     let empty_vec: Vec<Value> = Vec::new();
     let threads: Vec<String> = index["threads"]
         .as_array()
@@ -48,7 +45,6 @@ pub fn resolve_target_thread_id(
 }
 
 pub fn confirm_delete_primary() -> bool {
-
     println!("Are you sure you want to delete this conversation? (y/N)");
     print!("> ");
     io::stdout().flush().unwrap();
@@ -60,7 +56,6 @@ pub fn confirm_delete_primary() -> bool {
 }
 
 pub fn confirm_delete_destructive() -> bool {
-
     println!();
     println!(
         "{}",
@@ -89,8 +84,7 @@ pub fn perform_conversation_deletion(
     let convo_path = fur_dir.join("threads").join(format!("{}.json", target_tid));
 
     // Load convo to extract message IDs + title
-    let convo_content = fs::read_to_string(&convo_path)
-        .expect("Failed to load conversation JSON.");
+    let convo_content = fs::read_to_string(&convo_path).expect("Failed to load conversation JSON.");
     let convo: Value = serde_json::from_str(&convo_content).unwrap();
 
     let title = convo["title"].as_str().unwrap_or("Untitled");

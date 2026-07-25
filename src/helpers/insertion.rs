@@ -2,9 +2,9 @@ use serde_json::json;
 use std::fs;
 use std::path::Path;
 
-use crate::commands::jot::{self, JotArgs};
 use crate::commands::chat;
-use crate::commands::message::{MsgArgs, detect_id, resolve_target_message};
+use crate::commands::jot::{self, JotArgs};
+use crate::commands::message::{detect_id, resolve_target_message, MsgArgs};
 
 /// Main entry point: orchestrates insertion
 pub fn run_insert(args: &MsgArgs, insert_before: bool) {

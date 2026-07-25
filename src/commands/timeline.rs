@@ -1,14 +1,11 @@
+use clap::Parser;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::Path;
-use serde_json::{Value, json};
-use clap::Parser;
 
 use crate::renderer::{
-    terminal::render_message,
-    markdown::render_message_to_md,
-    pdf::export_convo_to_pdf,
+    markdown::render_message_to_md, pdf::export_convo_to_pdf, terminal::render_message,
 };
-
 
 /// Args for timeline command
 #[derive(Parser, Clone)]
@@ -23,7 +20,6 @@ pub struct TimelineArgs {
     #[clap(skip)]
     pub conversation_override: Option<String>,
 }
-
 
 /// Main entry for timeline
 pub fn run_timeline(args: TimelineArgs) {
@@ -42,28 +38,39 @@ pub fn run_timeline(args: TimelineArgs) {
         index["active_thread"].as_str().unwrap_or("")
     };
 
-    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    let conversation_json: Value = serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
+    let convo_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", conversation_id));
+    let conversation_json: Value =
+        serde_json::from_str(&fs::read_to_string(&convo_path).unwrap()).unwrap();
 
     let conversation_title = conversation_json["title"].as_str().unwrap_or("Untitled");
 
     // Load avatars
     let avatars: Value = serde_json::from_str(
-        &fs::read_to_string(fur_dir.join("avatars.json"))
-            .unwrap_or_else(|_| "{}".to_string())
-    ).unwrap_or(json!({}));
+        &fs::read_to_string(fur_dir.join("avatars.json")).unwrap_or_else(|_| "{}".to_string()),
+    )
+    .unwrap_or(json!({}));
 
     // Root messages (ids only)
     let empty_vec: Vec<Value> = Vec::new();
-    let root_msgs = conversation_json["messages"].as_array().unwrap_or(&empty_vec);
+    let root_msgs = conversation_json["messages"]
+        .as_array()
+        .unwrap_or(&empty_vec);
 
     // --- PDF mode
     if let Some(path) = &args.out {
         if path.ends_with(".pdf") {
-            export_convo_to_pdf(&fur_dir, conversation_title, root_msgs, &args, &avatars, path);
+            export_convo_to_pdf(
+                &fur_dir,
+                conversation_title,
+                root_msgs,
+                &args,
+                &avatars,
+                path,
+            );
             return;
         }
-
 
         // --- Markdown mode
         let mut out_content = String::new();
@@ -71,7 +78,14 @@ pub fn run_timeline(args: TimelineArgs) {
 
         for mid in root_msgs {
             if let Some(mid_str) = mid.as_str() {
-                render_message_to_md(&fur_dir, mid_str, "Root".to_string(), &args, &avatars, &mut out_content);
+                render_message_to_md(
+                    &fur_dir,
+                    mid_str,
+                    "Root".to_string(),
+                    &args,
+                    &avatars,
+                    &mut out_content,
+                );
             }
         }
 

@@ -1,14 +1,9 @@
-use std::path::Path;
 use clap::Parser;
 use colored::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
+use std::path::Path;
 
-use crate::helpers::search::{
-    parse_queries,
-    list_conversations,
-    search_messages_in_conversation,
-};
-
+use crate::helpers::search::{list_conversations, parse_queries, search_messages_in_conversation};
 
 /// Arguments for `fur search`
 #[derive(Parser)]
@@ -51,7 +46,10 @@ pub fn run_search(args: SearchArgs) {
 
     let threads = list_conversations(&threads_dir);
     for (tid, convo_json) in threads {
-        let title = convo_json["title"].as_str().unwrap_or("Untitled").to_string();
+        let title = convo_json["title"]
+            .as_str()
+            .unwrap_or("Untitled")
+            .to_string();
         let msg_ids: Vec<String> = convo_json["messages"]
             .as_array()
             .unwrap_or(&vec![])
@@ -59,11 +57,7 @@ pub fn run_search(args: SearchArgs) {
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
 
-        let mut matches = search_messages_in_conversation(
-            &msg_ids,
-            &messages_dir,
-            &queries,
-        );
+        let mut matches = search_messages_in_conversation(&msg_ids, &messages_dir, &queries);
 
         if let Some(limit) = args.limit {
             if matches.len() > limit {
@@ -88,7 +82,6 @@ pub fn run_search(args: SearchArgs) {
         println!("{}", serde_json::to_string_pretty(&output_json).unwrap());
     }
 }
-
 
 /// Pretty print results for one conversation
 fn print_conversation_results(tid: &str, title: &str, matches: &[Value]) {
@@ -120,15 +113,13 @@ fn print_conversation_results(tid: &str, title: &str, matches: &[Value]) {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
-    use std::fs;
     use serde_json::Value;
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::tempdir;
 
     fn setup_fur_project() -> (tempfile::TempDir, PathBuf) {
         let dir = tempdir().unwrap();
@@ -292,8 +283,12 @@ mod tests {
 
         let mut cmd = Command::cargo_bin("fur").expect("Binary exists");
 
-        // Build command: fur search <query> --json
-        let c = cmd.current_dir(root).arg("search");
+        // The fixture intentionally uses a minimal historical schema.
+        // Suppress the interactive migration prompt so stdout remains pure JSON.
+        let c = cmd
+            .env("FUR_SKIP_SCHEMA_MIGRATION", "1")
+            .current_dir(root)
+            .arg("search");
 
         c.arg(&args.query);
 
@@ -308,6 +303,4 @@ mod tests {
 
         String::from_utf8(out).unwrap()
     }
-
-
 }

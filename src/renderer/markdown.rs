@@ -1,6 +1,6 @@
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
 
 use crate::commands::timeline::TimelineArgs;
 use crate::renderer::utils::load_message;
@@ -70,7 +70,9 @@ pub fn render_message_to_md(
     avatars: &Value,
     out: &mut String,
 ) {
-    let Some(msg) = load_message(fur_dir, msg_id, avatars) else { return };
+    let Some(msg) = load_message(fur_dir, msg_id, avatars) else {
+        return;
+    };
 
     if let Some(att) = msg.attachment {
         if att.ends_with(".png")
@@ -91,7 +93,10 @@ pub fn render_message_to_md(
     }
 
     out.push_str(&format!("**{} [{}]:** {}\n", msg.name, msg.emoji, msg.text));
-    out.push_str(&format!("_{} {} - {}_\n\n", msg.date_str, msg.time_str, label));
+    out.push_str(&format!(
+        "_{} {} - {}_\n\n",
+        msg.date_str, msg.time_str, label
+    ));
 
     if args.verbose || args.contents {
         if let Some(path_str) = msg.markdown {
@@ -99,7 +104,6 @@ pub fn render_message_to_md(
                 // 🔥 Math-block conversion applied here
                 let converted = convert_bracket_math_block(&contents);
                 out.push_str(&format!("\n{}\n", converted));
-
             }
         }
     }

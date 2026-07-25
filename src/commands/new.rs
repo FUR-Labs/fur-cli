@@ -1,12 +1,12 @@
+use colored::*;
+use serde_json::{json, Value};
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
-use serde_json::{json, Value};
 use uuid::Uuid;
-use colored::*;
 
-use crate::schema::{make_index_metadata, make_conversation_metadata};
-use crate::frs::avatars::{load_avatars, save_avatars, get_random_emoji_for_name};
+use crate::frs::avatars::{get_random_emoji_for_name, load_avatars, save_avatars};
+use crate::schema::{make_conversation_metadata, make_index_metadata};
 
 fn init_fur_dir(fur_dir: &Path) -> io::Result<()> {
     fs::create_dir_all(fur_dir.join("threads"))?;
@@ -89,8 +89,6 @@ pub fn onboarding_auto(main: &str, other: &str) {
     save_avatars(&avatars);
 }
 
-
-
 fn run_new_internal(
     name: String,
     auto: bool,
@@ -124,9 +122,14 @@ fn run_new_internal(
     let conversation_meta = make_conversation_metadata(&name, &conversation_id);
 
     // --- Write conversation ---
-    let convo_path = fur_dir.join("threads").join(format!("{}.json", conversation_id));
-    fs::write(&convo_path, serde_json::to_string_pretty(&conversation_meta).unwrap())
-        .expect("Could not write conversation file");
+    let convo_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", conversation_id));
+    fs::write(
+        &convo_path,
+        serde_json::to_string_pretty(&conversation_meta).unwrap(),
+    )
+    .expect("Could not write conversation file");
 
     // --- Update index ---
     let index_path = fur_dir.join("index.json");
@@ -144,9 +147,13 @@ fn run_new_internal(
 
     println!(
         "{}",
-        format!("[NEW] Thread created: {} — \"{}\"", &conversation_id[..8], name)
-            .bright_green()
-            .bold()
+        format!(
+            "[NEW] Thread created: {} — \"{}\"",
+            &conversation_id[..8],
+            name
+        )
+        .bright_green()
+        .bold()
     );
 }
 
@@ -154,5 +161,3 @@ fn run_new_internal(
 pub fn run_new(name: String) {
     run_new_internal(name, false, None, None);
 }
-
-

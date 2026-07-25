@@ -1,7 +1,7 @@
 use assert_cmd::Command;
 use predicates::str::contains;
-use tempfile::tempdir;
 use std::fs;
+use tempfile::tempdir;
 
 /// Helper: bootstrap a `.fur` directory with minimal state
 fn setup_fur(tmp: &std::path::Path) {
@@ -28,7 +28,8 @@ fn chat_creates_file_and_message() {
     setup_fur(tmp.path());
 
     // 1. Start a new conversation so we have an active context
-    Command::cargo_bin("fur").unwrap()
+    Command::cargo_bin("fur")
+        .unwrap()
         .args(&["new", "Chat Test"])
         .assert()
         .success()

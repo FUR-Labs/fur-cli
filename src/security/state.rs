@@ -1,14 +1,13 @@
-use std::fs;
-use std::path::Path;
 use serde_json::json;
 use serde_json::Value;
+use std::fs;
+use std::path::Path;
 
 pub fn lock_file() -> &'static str {
     ".fur/lock.json"
 }
 
 pub fn is_locked() -> bool {
-
     let path = Path::new(lock_file());
 
     if !path.exists() {
@@ -25,19 +24,16 @@ pub fn is_locked() -> bool {
 }
 
 pub fn write_lock() {
-
     let data = json!({
         "locked": true,
         "algorithm": "AES-256-GCM",
         "version": 1
     });
 
-    fs::write(lock_file(), serde_json::to_string_pretty(&data).unwrap())
-        .unwrap();
+    fs::write(lock_file(), serde_json::to_string_pretty(&data).unwrap()).unwrap();
 }
 
 pub fn remove_lock() {
-
     let path = Path::new(lock_file());
 
     if path.exists() {

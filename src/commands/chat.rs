@@ -1,15 +1,21 @@
+use chrono::Utc;
+use colored::*;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::Path;
-use chrono::Utc;
-use colored::*;
 
 use crate::commands::jot::{self, JotArgs};
 
 /// Interactive chat-style jot for long / structured messages
 pub fn run_chat(avatar: Option<String>) {
-    println!("{}", "💬 Write / Copy-Paste your Markdown or text below.".bright_cyan());
-    println!("{}", "↪ Finish with Ctrl+D (Linux/macOS) or Ctrl+Z then Enter (Windows).".white());
+    println!(
+        "{}",
+        "💬 Write / Copy-Paste your Markdown or text below.".bright_cyan()
+    );
+    println!(
+        "{}",
+        "↪ Finish with Ctrl+D (Linux/macOS) or Ctrl+Z then Enter (Windows).".white()
+    );
     println!("{}", "↪ Press Ctrl+C to cancel.".white());
 
     // --- Capture multi-line input
@@ -39,7 +45,11 @@ pub fn run_chat(avatar: Option<String>) {
     let mut fname = String::new();
     io::stdin().read_line(&mut fname).unwrap();
     let fname = fname.trim();
-    let path = if fname.is_empty() { default_name } else { fname.to_string() };
+    let path = if fname.is_empty() {
+        default_name
+    } else {
+        fname.to_string()
+    };
 
     // Ensure chats dir exists
     if let Some(parent) = Path::new(&path).parent() {

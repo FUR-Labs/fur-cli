@@ -1,7 +1,6 @@
+use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde_json::{Value, json};
-
 
 pub fn search_messages_in_conversation(
     msg_ids: &[String],
@@ -79,7 +78,6 @@ pub fn search_markdown_field(
     None
 }
 
-
 /// Parse a search string into individual queries.
 /// Supports:
 ///   "deep learning"
@@ -100,7 +98,6 @@ pub fn parse_queries(q: &str) -> Vec<String> {
     // Case 2: no comma → single query
     vec![lowered]
 }
-
 
 /// Load all conversation JSONs in threads/
 pub fn list_conversations(threads_dir: &Path) -> Vec<(String, Value)> {
@@ -123,8 +120,6 @@ pub fn list_conversations(threads_dir: &Path) -> Vec<(String, Value)> {
 
     out
 }
-
-
 
 /// Search plain text for any query. Returns (query, snippet)
 pub fn match_any_query(text: &str, queries: &[String]) -> Option<(String, String)> {
@@ -167,7 +162,7 @@ pub fn snippet_around(text: &str, pos: usize, len: usize) -> String {
     let total = chars.len();
 
     let cpos = text[..pos].chars().count(); // convert byte offset → char index
-    let clen = text[pos..pos+len].chars().count();
+    let clen = text[pos..pos + len].chars().count();
 
     let cstart = cpos.saturating_sub(40);
     let cend = (cpos + clen + 40).min(total);
@@ -177,5 +172,3 @@ pub fn snippet_around(text: &str, pos: usize, len: usize) -> String {
         .collect::<String>()
         .replace('\n', " ")
 }
-
-
