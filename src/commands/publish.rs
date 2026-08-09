@@ -13,6 +13,7 @@ struct PublicationCreated {
     registry_id: String,
     snapshot_digest: String,
     published_at: String,
+    publication_state: String,
 }
 
 pub fn run_publish(conversation: Option<&str>, registry: &str) {
@@ -20,7 +21,11 @@ pub fn run_publish(conversation: Option<&str>, registry: &str) {
         .and_then(|intent| submit_publish_intent(registry, &intent))
     {
         Ok(created) => {
-            println!("✔ Published conversation");
+            match created.publication_state.as_str() {
+                "unchanged" => println!("✔ Conversation already published; no changes"),
+                "revised" => println!("✔ Published new conversation revision"),
+                _ => println!("✔ Published conversation"),
+            }
             println!("  Publication: {}", created.publication_id);
             println!("  Revision:    {}", created.revision_id);
             println!("  Registry:    {}", created.registry_id);
