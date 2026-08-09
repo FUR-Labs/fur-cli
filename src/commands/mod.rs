@@ -10,6 +10,8 @@ pub mod message;
 pub mod new;
 pub mod onboard;
 pub mod printed;
+pub mod publish;
+pub mod registry;
 pub mod rebuild;
 pub mod run;
 pub mod save;

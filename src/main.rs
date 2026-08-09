@@ -131,6 +131,26 @@ enum Commands {
     #[command(about = "Management:: Repair missing or moved attachments")]
     Doctor(DoctorArgs),
 
+    #[command(about = "Management:: Import a published FUR conversation from a registry")]
+    Import {
+        /// Registry publication ID
+        publication_id: String,
+
+        /// Publication registry base URL
+        #[arg(long, default_value = "http://127.0.0.1:8000")]
+        registry: String,
+    },
+
+    #[command(about = "Everyday:: Publish a canonical conversation to a registry")]
+    Publish {
+        /// Conversation ID or unique short hash; defaults to the active conversation
+        conversation: Option<String>,
+
+        /// Publication registry base URL
+        #[arg(long, default_value = "http://127.0.0.1:8000")]
+        registry: String,
+    },
+
     #[command(about = "Management:: Rebuild .fur/ from the documents in chats/")]
     Rebuild(RebuildArgs),
 
@@ -327,6 +347,16 @@ fn main() {
         Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
 
         Commands::Doctor(args) => doctor::run_doctor(args),
+
+        Commands::Import {
+            publication_id,
+            registry,
+        } => commands::registry::run_import(&publication_id, &registry),
+
+        Commands::Publish {
+            conversation,
+            registry,
+        } => commands::publish::run_publish(conversation.as_deref(), &registry),
 
         Commands::Rebuild(args) => rebuild::run_rebuild(args),
 

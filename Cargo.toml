@@ -32,6 +32,8 @@ sha2 = "0.10.9"
 indicatif = "0.17"
 aesus = "0.4"
 rpassword = "7"
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
 [dev-dependencies]
 assert_cmd = "2"
@@ -41,4 +43,3 @@ tempfile = "3"
 [lib]
 name = "fur_cli"
 path = "src/lib.rs"
-

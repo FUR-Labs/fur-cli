@@ -206,6 +206,111 @@ pub fn rebuild(root: &Path, force: bool) -> Result<RebuildSummary, String> {
     Ok(summary)
 }
 
+/// Add one already-validated canonical conversation document to the operational
+/// `.fur/` index without rebuilding or disturbing the rest of the project.
+///
+/// viceroy: this is the narrow import seam used by publication registries. The conversation
+/// directory remains authoritative; the JSON written here is only its local
+/// projection.
+pub fn import_document(
+    root: &Path,
+    folder: &Path,
+    doc: &FurDocument,
+) -> Result<(), String> {
+    let fur_dir = root.join(".fur");
+    let thread_path = fur_dir
+        .join("threads")
+        .join(format!("{}.json", doc.conversation_id));
+
+    if thread_path.exists() {
+        return Err(format!(
+            "conversation {} is already indexed",
+            doc.conversation_id
+        ));
+    }
+
+    for msg in &doc.messages {
+        let message_path = fur_dir.join("messages").join(format!("{}.json", msg.id));
+        if message_path.exists() {
+            return Err(format!("message id {} is already indexed", msg.id));
+        }
+    }
+
+    fs::create_dir_all(fur_dir.join("threads"))
+        .map_err(|e| format!("cannot create .fur/threads: {}", e))?;
+    fs::create_dir_all(fur_dir.join("messages"))
+        .map_err(|e| format!("cannot create .fur/messages: {}", e))?;
+
+    for msg in &doc.messages {
+        write_message(&fur_dir, root, folder, msg)?;
+    }
+    write_thread(&fur_dir, doc)?;
+    append_to_index(&fur_dir, &doc.conversation_id)?;
+    merge_avatars(&fur_dir, doc)?;
+
+    Ok(())
+}
+
+fn append_to_index(fur_dir: &Path, conversation_id: &str) -> Result<(), String> {
+    let path = fur_dir.join("index.json");
+    let mut value: Value = if path.exists() {
+        let content = fs::read_to_string(&path)
+            .map_err(|e| format!("cannot read {}: {}", path.display(), e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("invalid JSON in {}: {}", path.display(), e))?
+    } else {
+        json!({
+            "threads": [],
+            "active_thread": Value::Null,
+            "current_message": Value::Null,
+            "created_at": chrono::Utc::now().to_rfc3339(),
+            "schema_version": SCHEMA_VERSION
+        })
+    };
+
+    let threads = value["threads"]
+        .as_array_mut()
+        .ok_or("index.json has no threads array")?;
+    if threads.iter().any(|item| item.as_str() == Some(conversation_id)) {
+        return Err(format!("conversation {} is already indexed", conversation_id));
+    }
+    threads.push(json!(conversation_id));
+    value["active_thread"] = json!(conversation_id);
+    value["current_message"] = Value::Null;
+
+    fs::write(&path, pretty(&value))
+        .map_err(|e| format!("cannot write {}: {}", path.display(), e))
+}
+
+fn merge_avatars(fur_dir: &Path, doc: &FurDocument) -> Result<(), String> {
+    let path = fur_dir.join("avatars.json");
+    let mut value: Value = if path.exists() {
+        let content = fs::read_to_string(&path)
+            .map_err(|e| format!("cannot read {}: {}", path.display(), e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("invalid JSON in {}: {}", path.display(), e))?
+    } else {
+        json!({})
+    };
+
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for msg in &doc.messages {
+        *counts.entry(msg.avatar.clone()).or_insert(0) += 1;
+        if value.get(&msg.avatar).is_none() {
+            value[msg.avatar.as_str()] = json!("🐾");
+        }
+    }
+
+    if value.get("main").and_then(|item| item.as_str()).is_none() {
+        if let Some((name, _)) = counts.iter().max_by_key(|(_, count)| **count) {
+            value["main"] = json!(name);
+        }
+    }
+
+    fs::write(&path, pretty(&value))
+        .map_err(|e| format!("cannot write {}: {}", path.display(), e))
+}
+
 fn write_message(
     fur_dir: &Path,
     root: &Path,
