@@ -1,3 +1,4 @@
+pub mod avatars;
 mod commands;
 mod frs;
 mod git;
@@ -25,7 +26,11 @@ use crate::commands::{
     jot::{self, JotArgs},
     jump::{self, JumpArgs},
     message::{self, MsgArgs},
-    new, printed, run,
+    new,
+    onboard::{self, OnboardArgs},
+    printed,
+    rebuild::{self, RebuildArgs},
+    run,
     save::{self, SaveArgs},
     search::{self, SearchArgs},
     status,
@@ -125,6 +130,12 @@ enum Commands {
 
     #[command(about = "Management:: Repair missing or moved attachments")]
     Doctor(DoctorArgs),
+
+    #[command(about = "Management:: Rebuild .fur/ from the documents in chats/")]
+    Rebuild(RebuildArgs),
+
+    #[command(about = "Management:: Set which avatar is you, and pick faces")]
+    Onboard(OnboardArgs),
 
     // Management
     #[command(about = "Management:: See or create new conversation avatars/personas")]
@@ -245,6 +256,15 @@ fn main() {
 
     let cli = Cli::parse();
 
+    // Locked archives, and copied archives with no .fur/ index.
+    let exempt = matches!(
+        cli.command,
+        Commands::Unlock(_) | Commands::Keygen { .. } | Commands::Completions { .. }
+    );
+    if !commands::rebuild::preflight(exempt) {
+        return;
+    }
+
     let skip_schema_migration = std::env::var_os("FUR_SKIP_SCHEMA_MIGRATION").is_some();
 
     if !skip_schema_migration && schema::detect_old_schema() {
@@ -307,6 +327,10 @@ fn main() {
         Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
 
         Commands::Doctor(args) => doctor::run_doctor(args),
+
+        Commands::Rebuild(args) => rebuild::run_rebuild(args),
+
+        Commands::Onboard(args) => onboard::run_onboard(args),
 
         Commands::Avatar { action, .. } => match action {
             Some(AvatarAction::New) => avatar::run_avatar_onboarding(),

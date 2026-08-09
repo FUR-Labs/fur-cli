@@ -3,11 +3,24 @@ use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
+use crate::schema::rebuild::LOCK_SENTINEL;
+
 pub fn lock_file() -> &'static str {
     ".fur/lock.json"
 }
 
+/// True when either the disposable flag in `.fur/` or the durable sentinel in
+/// `chats/` says so.
+///
+/// viceroy: previously consulted `.fur/lock.json` alone. Once `.fur/` became
+/// rebuildable, deleting it discarded the only record that `chats/` was
+/// ciphertext — `fur unlock` then reported "already unlocked" and refused to
+/// decrypt. The sentinel lives with the data it describes.
 pub fn is_locked() -> bool {
+    if Path::new("chats").join(LOCK_SENTINEL).exists() {
+        return true;
+    }
+
     let path = Path::new(lock_file());
 
     if !path.exists() {
@@ -30,7 +43,9 @@ pub fn write_lock() {
         "version": 1
     });
 
-    fs::write(lock_file(), serde_json::to_string_pretty(&data).unwrap()).unwrap();
+    if Path::new(".fur").exists() {
+        let _ = fs::write(lock_file(), serde_json::to_string_pretty(&data).unwrap());
+    }
 }
 
 pub fn remove_lock() {

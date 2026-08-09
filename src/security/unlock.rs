@@ -2,8 +2,9 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use rpassword::read_password;
+use walkdir::WalkDir;
 
+use crate::schema::rebuild::{LOCK_CHECK, LOCK_SENTINEL};
 use crate::security::{crypto, io, state};
 
 #[derive(Parser, Clone)]
@@ -18,12 +19,9 @@ pub fn run_unlock(args: UnlockArgs) {
         return;
     }
 
-    let pass = if args.hide {
-        println!("🔑 Enter password:");
-        read_password().unwrap()
-    } else {
-        io::read_visible_password()
-    };
+    let _ = args.hide;
+
+    let pass = io::read_password("🔑 Enter password: ");
 
     if !verify_password(&pass) {
         println!("❌ Incorrect password. Project remains locked.");
@@ -32,27 +30,73 @@ pub fn run_unlock(args: UnlockArgs) {
 
     decrypt_project(&pass);
 
+    remove_sentinel();
     state::remove_lock();
 
     println!("🔓 Project decrypted.");
 }
 
+/// Verify in order of durability: the checker beside the data, then the one in
+/// `.fur/`, then — if both are gone — a trial decryption of a real document.
+///
+/// viceroy: the trial path is the recovery case. An archive locked before this
+/// fix has both checkers only inside `.fur/`, so deleting the index left the
+/// password unverifiable and the data unreachable.
 fn verify_password(password: &str) -> bool {
-    let check_path = Path::new(".fur/.lockcheck");
+    for check_path in [
+        Path::new("chats").join(LOCK_CHECK),
+        Path::new(".fur/.lockcheck").to_path_buf(),
+    ] {
+        if let Ok(bytes) = fs::read(&check_path) {
+            if let Ok(decrypted) = crypto::decrypt(&bytes, password) {
+                if std::str::from_utf8(&decrypted)
+                    .map(|t| t.trim() == "FUR_LOCK_CHECK_V1")
+                    .unwrap_or(false)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
 
-    let bytes = match std::fs::read(check_path) {
-        Ok(b) => b,
-        Err(_) => return false,
-    };
+    trial_decrypt(password)
+}
 
-    let decrypted = match crypto::decrypt(&bytes, password) {
-        Ok(d) => d,
-        Err(_) => return false,
-    };
+/// Last resort: if any encrypted document decrypts cleanly, the password is
+/// right. Nothing is written here — this only answers yes or no.
+fn trial_decrypt(password: &str) -> bool {
+    for entry in WalkDir::new("chats")
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let p = entry.path();
 
-    match std::str::from_utf8(&decrypted) {
-        Ok(text) => text.trim() == "FUR_LOCK_CHECK_V1",
-        Err(_) => false,
+        if !p.is_file() || is_sentinel(p) {
+            continue;
+        }
+
+        if let Ok(bytes) = fs::read(p) {
+            if crypto::decrypt(&bytes, password).is_ok() {
+                return true;
+            }
+        }
+    }
+
+    eprintln!("⚠ No verifiable encrypted content found under chats/.");
+    false
+}
+
+/// Removed only after decryption succeeds, so an interrupted unlock still
+/// leaves the archive correctly marked as locked.
+fn remove_sentinel() {
+    for name in [LOCK_SENTINEL, LOCK_CHECK] {
+        let path = Path::new("chats").join(name);
+
+        if path.exists() {
+            let _ = fs::remove_file(path);
+        }
     }
 }
 
@@ -88,6 +132,8 @@ fn decrypt_file(path: &str, password: &str) {
     }
 }
 
+/// viceroy: mirrors the recursion fix in `lock.rs` — a flat walk would leave
+/// `chats/<slug>/` documents encrypted forever.
 fn decrypt_markdowns(password: &str) {
     let chats = Path::new("chats");
 
@@ -95,13 +141,24 @@ fn decrypt_markdowns(password: &str) {
         return;
     }
 
-    if let Ok(entries) = fs::read_dir(chats) {
-        for e in entries.flatten() {
-            let p = e.path();
+    for entry in WalkDir::new(chats)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let p = entry.path();
 
-            if p.is_file() {
-                io::decrypt_file(&p, password);
-            }
+        if !p.is_file() || is_sentinel(p) {
+            continue;
         }
+
+        io::decrypt_file(p, password);
     }
+}
+
+fn is_sentinel(path: &Path) -> bool {
+    matches!(
+        path.file_name().and_then(|f| f.to_str()),
+        Some(LOCK_SENTINEL) | Some(LOCK_CHECK)
+    )
 }

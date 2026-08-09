@@ -45,10 +45,14 @@ pub fn run_jot(args: JotArgs) {
         return eprintln!("{}", e);
     }
 
+    // Bring the attachment into the conversation folder before recording its
+    // path, so the archive stays self-contained.
+    let markdown = args.markdown.as_deref().map(adopt_markdown);
+
     let msg = build_message(
         &avatar,
         text_opt.clone(),
-        args.markdown.clone(),
+        markdown,
         args.img.clone(),
         args.parent.clone(),
     );
@@ -68,4 +72,8 @@ pub fn apply_jot_effects(
     update_conversation(ctx, msg_id, parent);
     update_index(&ctx.fur_dir, msg_id);
     print_confirmation(&ctx.avatars, avatar, msg_id, &ctx.conversation_id);
+
+    // viceroy: dual-write — .fur/ is written above and stays authoritative;
+    // chats/<slug>/convo.md is regenerated from it so the two cannot drift.
+    crate::schema::bridge::sync_active();
 }

@@ -138,6 +138,8 @@ fn handle_rename_thread(index: &mut Value, fur_dir: &Path, args: &ThreadArgs) {
         old_title,
         new_title
     );
+
+    crate::schema::bridge::sync_active();
 }
 
 fn handle_delete_thread(index: &mut Value, fur_dir: &Path, args: &ThreadArgs) {

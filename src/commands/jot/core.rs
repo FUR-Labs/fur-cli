@@ -68,6 +68,84 @@ fn build_markdown_meta(path: &str) -> Option<Value> {
     }))
 }
 
+/// Copy an attachment into the conversation folder and return the new path.
+///
+/// viceroy: `--file` used to record wherever the file already lived, so a
+/// conversation referencing `~/notes.md` was not portable — copy `chats/` to
+/// another machine and the attachment is simply gone. The archive now owns a
+/// snapshot, and the hash in `markdown_meta` is what later detects that the
+/// user's live file has drifted from it.
+pub fn adopt_markdown(raw: &str) -> String {
+    let src = Path::new(raw);
+
+    if !src.exists() {
+        // Missing files are left alone; `fur doctor` is the tool for that.
+        return raw.to_string();
+    }
+
+    let Some(folder) = crate::schema::bridge::active_folder(Path::new(".")) else {
+        return raw.to_string();
+    };
+
+    let Some(name) = src.file_name() else {
+        return raw.to_string();
+    };
+
+    let dst = folder.join(name);
+
+    // Already inside the conversation folder (e.g. written there by `chat`).
+    if let (Ok(a), Ok(b)) = (fs::canonicalize(src), fs::canonicalize(&dst)) {
+        if a == b {
+            return normalize(&dst);
+        }
+    }
+
+    // Never silently replace a different file that happens to share a name.
+    let dst = if dst.exists() && !same_contents(src, &dst) {
+        folder.join(unique_name(&folder, name.to_string_lossy().as_ref()))
+    } else {
+        dst
+    };
+
+    match fs::copy(src, &dst) {
+        Ok(_) => normalize(&dst),
+        Err(e) => {
+            eprintln!("⚠ Could not copy attachment into chats/: {}", e);
+            raw.to_string()
+        }
+    }
+}
+
+fn same_contents(a: &Path, b: &Path) -> bool {
+    match (compute_hash(a), compute_hash(b)) {
+        (Some(x), Some(y)) => x == y,
+        _ => false,
+    }
+}
+
+fn unique_name(folder: &Path, name: &str) -> String {
+    let (stem, ext) = match name.rsplit_once('.') {
+        Some((s, e)) => (s.to_string(), format!(".{}", e)),
+        None => (name.to_string(), String::new()),
+    };
+
+    for n in 2..1000 {
+        let candidate = format!("{}-{}{}", stem, n, ext);
+        if !folder.join(&candidate).exists() {
+            return candidate;
+        }
+    }
+
+    name.to_string()
+}
+
+fn normalize(path: &Path) -> String {
+    path.strip_prefix("./")
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
 pub fn resolve_avatar_and_text(avatars: &Value, args: &JotArgs) -> (String, Option<String>) {
     let map = avatars.as_object().expect("avatars.json must be valid");
 
@@ -107,7 +185,10 @@ pub fn build_message(
 pub fn upgrade_message_schema(msg: &mut Value) -> bool {
     let schema = msg["schema_version"].as_str().unwrap_or("0.1");
 
-    if schema >= SCHEMA_VERSION {
+    // viceroy: was `schema >= SCHEMA_VERSION`, a lexicographic string compare —
+    // "0.10" sorts before "0.3", so the first bump past 0.9 would have silently
+    // stopped upgrading. Equality is all this needs.
+    if schema == SCHEMA_VERSION {
         return false;
     }
 

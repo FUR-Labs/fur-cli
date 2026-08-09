@@ -38,7 +38,19 @@ pub fn run_chat(avatar: Option<String>) {
     }
 
     // --- Filename suggestion
-    let default_name = format!("chats/CHAT-{}.md", Utc::now().format("%Y%m%d-%H%M%S"));
+    //
+    // viceroy: long-form files used to land in `chats/` root and were then
+    // *copied* into the conversation folder, leaving the original behind as an
+    // orphan that rebuild could not see but `lock` still encrypted. They are
+    // written straight into `chats/<slug>/` now.
+    let folder = crate::schema::bridge::active_folder(Path::new("."))
+        .unwrap_or_else(|| Path::new("chats").to_path_buf());
+
+    let default_name = folder
+        .join(format!("CHAT-{}.md", Utc::now().format("%Y%m%d-%H%M%S")))
+        .to_string_lossy()
+        .to_string();
+
     println!("Save as? (default: {})", default_name);
     print!("> ");
     io::stdout().flush().unwrap();
@@ -51,7 +63,7 @@ pub fn run_chat(avatar: Option<String>) {
         fname.to_string()
     };
 
-    // Ensure chats dir exists
+    // Ensure the destination dir exists
     if let Some(parent) = Path::new(&path).parent() {
         fs::create_dir_all(parent).ok();
     }

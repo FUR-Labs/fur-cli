@@ -89,6 +89,8 @@ fn run_delete(args: MsgArgs) {
     update_current_after_delete(&target);
 
     println!("🗑️ Deleted {}", &target[..8]);
+
+    crate::schema::bridge::sync_active();
 }
 
 //
@@ -134,6 +136,8 @@ fn run_edit(args: MsgArgs) {
     write_json(&msg_path, &msg);
 
     println!("✏️ Edited {}", &id[..8]);
+
+    crate::schema::bridge::sync_active();
 }
 
 //

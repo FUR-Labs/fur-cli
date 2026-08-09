@@ -77,6 +77,33 @@ pub fn run_export(args: ExportArgs) {
         exported,
         targets.len()
     );
+
+    report_orphans(project_root);
+}
+
+/// Long-form files sitting in `chats/` root that also exist inside a
+/// conversation folder. Rebuild cannot see them; `lock` still encrypts them.
+fn report_orphans(project_root: &Path) {
+    let orphans = crate::schema::bridge::find_orphans(project_root);
+
+    if orphans.is_empty() {
+        return;
+    }
+
+    println!(
+        "\n{}",
+        "Duplicate long-form files in chats/ root".bright_yellow().bold()
+    );
+
+    for p in &orphans {
+        println!("  • {}", p.display());
+    }
+
+    println!(
+        "{}",
+        "  These are already inside their conversation folder and can be deleted."
+            .bright_black()
+    );
 }
 
 fn export_one(

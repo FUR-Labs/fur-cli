@@ -77,7 +77,7 @@ fn message_from_json(mid: &str, msg: &Value) -> FurMessage {
     );
 
     if let Some(text) = msg["text"].as_str() {
-        out.body = text.to_string();
+        out = out.with_body(text);
     }
 
     if let Some(md_raw) = msg["markdown"].as_str() {
@@ -95,8 +95,7 @@ fn message_from_json(mid: &str, msg: &Value) -> FurMessage {
             .map(|s| s.to_string())
             .or_else(|| hash_file(Path::new(md_raw)));
 
-        out.link = Some(filename);
-        out.sha256 = hash;
+        out = out.with_link(filename, hash);
     }
 
     if let Some(img) = msg["attachment"].as_str() {
@@ -174,12 +173,188 @@ pub fn write_conversation_folder(
         if dst.exists() && !force {
             continue;
         }
+        if same_file(src, &dst) {
+            continue;
+        }
 
         fs::copy(src, &dst)
             .map_err(|e| format!("cannot copy {} → {}: {}", src.display(), dst.display(), e))?;
     }
 
     Ok(folder)
+}
+
+/// Keep `chats/<slug>/` in step with `.fur/` for one conversation.
+///
+/// Dual-write: `.fur/` remains authoritative and is written first by the
+/// calling command; this regenerates the document from it. Regeneration rather
+/// than append is deliberate — `serialize` is byte-stable, so rewriting the
+/// whole spine is idempotent and the two stores cannot drift apart.
+pub fn sync_conversation(
+    project_root: &Path,
+    fur_dir: &Path,
+    tid: &str,
+) -> Result<PathBuf, String> {
+    let doc = document_from_thread(fur_dir, tid)?;
+    let linked = linked_sources(fur_dir, tid)?;
+
+    // A retitled conversation wants a new slug. Move the existing folder
+    // instead of leaving an orphan behind under the old name.
+    let chats = project_root.join("chats");
+    let desired = slug_for(&doc);
+
+    if let Some(existing) = find_folder_for(&chats, &doc.conversation_id) {
+        let same = existing.file_name().and_then(|f| f.to_str()) == Some(desired.as_str());
+        if !same {
+            let target = chats.join(&desired);
+            if !target.exists() {
+                fs::rename(&existing, &target).map_err(|e| {
+                    format!("cannot rename {} → {}: {}", existing.display(), target.display(), e)
+                })?;
+            }
+        }
+    }
+
+    write_conversation_folder(project_root, &doc, &linked, true)
+}
+
+/// Best-effort sync of the active conversation, for commands that have just
+/// mutated `.fur/`.
+///
+/// Never panics and never blocks the command that called it: a failure to
+/// update `chats/` is a warning, because `.fur/` is still the source of truth
+/// in this phase and the user's write has already succeeded.
+pub fn sync_active() {
+    if crate::security::state::is_locked() {
+        return;
+    }
+
+    let fur_dir = Path::new(".fur");
+    let index_path = fur_dir.join("index.json");
+
+    if !index_path.exists() {
+        return;
+    }
+
+    let Some(content) = crate::security::io::read_text_file(&index_path) else {
+        return;
+    };
+
+    let Ok(index) = serde_json::from_str::<Value>(&content) else {
+        return;
+    };
+
+    let Some(tid) = index["active_thread"].as_str() else {
+        return;
+    };
+
+    if tid.is_empty() {
+        return;
+    }
+
+    if let Err(e) = sync_conversation(Path::new("."), fur_dir, tid) {
+        eprintln!("⚠ chats/ not updated: {}", e);
+    }
+}
+
+fn same_file(a: &Path, b: &Path) -> bool {
+    match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => false,
+    }
+}
+
+/// Folder the active conversation's files belong in, creating it if needed.
+///
+/// `chat` needs this *before* the message exists, so it is derived from the
+/// thread metadata rather than by looking for a folder that may not be there
+/// yet.
+pub fn active_folder(project_root: &Path) -> Option<PathBuf> {
+    let fur_dir = project_root.join(".fur");
+
+    let index: Value = read_json(&fur_dir.join("index.json")).ok()?;
+    let tid = index["active_thread"].as_str()?;
+
+    if tid.is_empty() {
+        return None;
+    }
+
+    let doc = document_from_thread(&fur_dir, tid).ok()?;
+    let chats = project_root.join("chats");
+
+    // Honour an existing folder even if the title has since changed.
+    let folder = find_folder_for(&chats, &doc.conversation_id)
+        .unwrap_or_else(|| chats.join(slug_for(&doc)));
+
+    fs::create_dir_all(&folder).ok()?;
+
+    Some(folder)
+}
+
+/// Top-level `chats/*.md` files that are already present inside a conversation
+/// folder. Rebuild only walks `chats/<slug>/`, so these are invisible to it
+/// while still being encrypted by `lock` — orphans in every sense.
+pub fn find_orphans(project_root: &Path) -> Vec<PathBuf> {
+    let chats = project_root.join("chats");
+
+    let Ok(entries) = fs::read_dir(&chats) else {
+        return Vec::new();
+    };
+
+    let mut adopted: Vec<String> = Vec::new();
+
+    for entry in entries.flatten() {
+        let dir = entry.path();
+        if !dir.is_dir() {
+            continue;
+        }
+        if let Ok(files) = fs::read_dir(&dir) {
+            for f in files.flatten() {
+                if let Some(name) = f.path().file_name().and_then(|n| n.to_str()) {
+                    adopted.push(name.to_string());
+                }
+            }
+        }
+    }
+
+    let Ok(entries) = fs::read_dir(&chats) else {
+        return Vec::new();
+    };
+
+    entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_file())
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| adopted.iter().any(|a| a == n))
+                .unwrap_or(false)
+        })
+        .collect()
+}
+
+/// Locate an existing conversation folder by its id suffix, so a rename can
+/// find the folder even though the slug has changed.
+fn find_folder_for(chats: &Path, conversation_id: &str) -> Option<PathBuf> {
+    let suffix = format!("-{}", short(conversation_id));
+
+    let entries = fs::read_dir(chats).ok()?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let name = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
+        if name.ends_with(&suffix) || name == short(conversation_id) {
+            return Some(path);
+        }
+    }
+
+    None
 }
 
 /// Folder name for a conversation: readable title slug, disambiguated by the

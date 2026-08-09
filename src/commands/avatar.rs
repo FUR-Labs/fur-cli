@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use crate::commands::utils::input::{ask_raw, ask_string, ask_yes_no, default_yes};
-use crate::frs::avatars::{get_random_emoji_for_name, load_avatars, save_avatars};
-use crate::frs::emojis::{preview_emojis, search_emojis};
+use crate::avatars::emojis::pick_emoji;
+use crate::avatars::{get_random_emoji_for_name, load_avatars, save_avatars, MAIN_EMOJI};
+use crate::commands::utils::input::{ask_string, ask_yes_no, default_yes};
 use crate::renderer::table::render_table;
 use colored::*;
 use serde_json::json;
 
-fn count_messages_per_avatar() -> HashMap<String, usize> {
+pub fn count_messages_per_avatar() -> HashMap<String, usize> {
     let mut counts = HashMap::new();
     let messages_dir = Path::new(".fur/messages");
 
@@ -97,19 +97,26 @@ fn create_main_avatar(avatars: &mut serde_json::Value) {
     let name = ask_string("Main avatar name [me]: ", Some("me"));
 
     avatars["main"] = json!(name);
-    avatars[name.clone()] = json!("🦊");
+    avatars[name.clone()] = json!(MAIN_EMOJI);
     println!("[OK] Main avatar set: {}", name);
 }
 
 fn create_secondary_avatar(avatars: &mut serde_json::Value) {
     let name = ask_string("Choose name [ai]: ", Some("ai"));
 
-    let skip = ask_yes_no("Skip emoji? [Y/n]: ", default_yes);
+    let suggested = get_random_emoji_for_name(&name);
 
+    let skip = ask_yes_no(
+        &format!("Use suggested emoji {}? [Y/n]: ", suggested),
+        default_yes,
+    );
+
+    // viceroy: the picker moved to `avatars::emojis::pick_emoji` so onboarding
+    // can use the same one instead of a hardcoded lookup table.
     let emoji = if skip {
-        get_random_emoji_for_name(&name)
+        suggested
     } else {
-        choose_emoji()
+        pick_emoji("Your choice: ", None)
     };
 
     avatars[name.clone()] = json!(emoji);
@@ -118,42 +125,4 @@ fn create_secondary_avatar(avatars: &mut serde_json::Value) {
         "[OK] Other avatar '{}' created with emoji '{}'",
         name, emoji
     );
-}
-
-fn choose_emoji() -> String {
-    preview_emojis(50);
-
-    loop {
-        let input = ask_raw("Your choice: ");
-
-        // numeric index from global list
-        if let Ok(idx) = input.parse::<usize>() {
-            if let Some(e) = emojis::iter().nth(idx) {
-                return e.to_string();
-            }
-            println!("Index out of range.");
-            continue;
-        }
-
-        // keyword search
-        let matches = search_emojis(&input);
-        if matches.is_empty() {
-            println!("No matches for '{}'. Try again.", input);
-            continue;
-        }
-
-        println!("Matches for '{}':", input);
-        for (i, emoji) in matches.iter().enumerate() {
-            println!("#{:<2} {:<2}  — {}", i, emoji, emoji.name());
-        }
-
-        let pick = ask_raw("Pick a hash index from these results: ");
-        if let Ok(i) = pick.parse::<usize>() {
-            if let Some(e) = matches.get(i) {
-                return e.to_string();
-            }
-        }
-
-        println!("Invalid choice, looping again.");
-    }
 }

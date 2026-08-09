@@ -125,11 +125,7 @@ fn render_message(
         let avatar_key = msg["avatar"].as_str().unwrap_or("???");
         let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
-        let text = msg.get("text").and_then(|v| v.as_str()).unwrap_or_else(|| {
-            msg.get("markdown")
-                .and_then(|v| v.as_str())
-                .unwrap_or("<no content>")
-        });
+        let text = crate::renderer::utils::preview_of(msg, 60);
 
         let id_display = msg_id[..8].to_string();
 

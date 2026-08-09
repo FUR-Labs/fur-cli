@@ -48,19 +48,7 @@ pub fn print_lineage(map: &HashMap<String, Value>, current: &str, avatars: &Valu
             let avatar_key = msg["avatar"].as_str().unwrap_or("???");
             let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
-            let text = msg
-                .get("text")
-                .and_then(|v| v.as_str())
-                .or_else(|| msg["markdown"].as_str())
-                .unwrap_or("<no content>");
-
-            let preview = text
-                .lines()
-                .next()
-                .unwrap_or("")
-                .chars()
-                .take(40)
-                .collect::<String>();
+            let preview = crate::renderer::utils::preview_of(msg, 40);
 
             let marker = if mid == current {
                 "(current)".cyan().bold()
@@ -164,19 +152,7 @@ fn render_preview(msg: &Value, avatars: &Value, cid: &str, map: &Map) {
     let avatar_key = msg["avatar"].as_str().unwrap_or("???");
     let (name, emoji) = resolve_avatar(avatars, avatar_key);
 
-    let text = msg
-        .get("text")
-        .and_then(|v| v.as_str())
-        .or_else(|| msg["markdown"].as_str())
-        .unwrap_or("<no content>");
-
-    let preview = text
-        .lines()
-        .next()
-        .unwrap_or("")
-        .chars()
-        .take(40)
-        .collect::<String>();
+    let preview = crate::renderer::utils::preview_of(msg, 40);
 
     let branch_label = compute_branch_label(cid, map);
 
