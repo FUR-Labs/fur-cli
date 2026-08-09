@@ -21,6 +21,7 @@ use std::path::Path;
 use crate::commands::{
     avatar, chat, clone, conversation,
     doctor::{self, DoctorArgs},
+    export::{self, ExportArgs},
     jot::{self, JotArgs},
     jump::{self, JumpArgs},
     message::{self, MsgArgs},
@@ -118,6 +119,9 @@ enum Commands {
 
     #[command(about = "Everyday:: Search all conversations for text or markdown matches")]
     Search(SearchArgs),
+
+    #[command(about = "Everyday:: Export conversations as canonical Markdown into chats/")]
+    Export(ExportArgs),
 
     #[command(about = "Management:: Repair missing or moved attachments")]
     Doctor(DoctorArgs),
@@ -329,6 +333,7 @@ fn main() {
 
         Commands::Tree(a) => tree::run_tree(a),
         Commands::Search(a) => search::run_search(a),
+        Commands::Export(a) => export::run_export(a),
 
         Commands::Scan {
             depth,
