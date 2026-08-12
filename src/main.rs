@@ -136,6 +136,10 @@ enum Commands {
         /// Registry publication ID
         publication_id: String,
 
+        /// Import a complete published FUR diary
+        #[arg(long)]
+        diary: bool,
+
         /// Publication registry base URL
         #[arg(long, default_value = "http://127.0.0.1:8000")]
         registry: String,
@@ -145,6 +149,16 @@ enum Commands {
     Publish {
         /// Conversation ID or unique short hash; defaults to the active conversation
         conversation: Option<String>,
+
+        /// Publish a FUR project diary. With no value, uses the current project;
+        /// pass a path such as `fur publish --diary atom` after `fur scan`.
+        #[arg(
+            long,
+            conflicts_with = "conversation",
+            num_args = 0..=1,
+            default_missing_value = "."
+        )]
+        diary: Option<String>,
 
         /// Publication registry base URL
         #[arg(long, default_value = "http://127.0.0.1:8000")]
@@ -350,13 +364,19 @@ fn main() {
 
         Commands::Import {
             publication_id,
+            diary,
             registry,
-        } => commands::registry::run_import(&publication_id, &registry),
+        } => commands::registry::run_import(&publication_id, diary, &registry),
 
         Commands::Publish {
             conversation,
+            diary,
             registry,
-        } => commands::publish::run_publish(conversation.as_deref(), &registry),
+        } => commands::publish::run_publish(
+            conversation.as_deref(),
+            diary.as_deref(),
+            &registry,
+        ),
 
         Commands::Rebuild(args) => rebuild::run_rebuild(args),
 

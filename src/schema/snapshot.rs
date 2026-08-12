@@ -145,22 +145,26 @@ fn collect_snapshot_files(folder: &Path) -> Result<Vec<SnapshotFile>, String> {
         if relative == ORIGIN_FILENAME {
             continue;
         }
-        let bytes = fs::read(&path)
-            .map_err(|e| format!("cannot read {}: {}", path.display(), e))?;
-        let (encoding, content) = match String::from_utf8(bytes.clone()) {
-            Ok(text) => ("utf-8", text),
-            Err(_) => ("base64", BASE64.encode(&bytes)),
-        };
-        files.push(SnapshotFile {
-            path: relative.clone(),
-            media_type: media_type(&relative).to_string(),
-            size: bytes.len() as u64,
-            sha256: sha256(&bytes),
-            encoding,
-            content,
-        });
+        files.push(snapshot_file(folder, &path)?);
     }
     Ok(files)
+}
+
+pub(crate) fn snapshot_file(root: &Path, path: &Path) -> Result<SnapshotFile, String> {
+    let relative = relative_path(root, path)?;
+    let bytes = fs::read(path).map_err(|e| format!("cannot read {}: {}", path.display(), e))?;
+    let (encoding, content) = match String::from_utf8(bytes.clone()) {
+        Ok(text) => ("utf-8", text),
+        Err(_) => ("base64", BASE64.encode(&bytes)),
+    };
+    Ok(SnapshotFile {
+        path: relative.clone(),
+        media_type: media_type(&relative).to_string(),
+        size: bytes.len() as u64,
+        sha256: sha256(&bytes),
+        encoding,
+        content,
+    })
 }
 
 fn collect_paths(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), String> {

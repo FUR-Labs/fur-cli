@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::schema::bridge::slug_for;
 use crate::schema::document::{parse, FurDocument};
-use crate::schema::rebuild::{import_document, spine_paths};
+use crate::schema::rebuild::{import_document, rebuild, spine_paths};
 
 const ORIGIN_FILENAME: &str = ".fur-origin.json";
 
@@ -60,7 +60,66 @@ struct ValidatedPull {
     files: BTreeMap<String, Vec<u8>>,
 }
 
-pub fn run_import(publication_id: &str, registry: &str) {
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct DiaryOriginReceipt {
+    receipt_schema: String,
+    origin_kind: String,
+    registry_id: String,
+    publication_id: String,
+    revision_id: String,
+    snapshot_digest: String,
+    pulled_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DiaryPullPackage {
+    pull_schema: String,
+    receipt: DiaryOriginReceipt,
+    #[allow(dead_code)]
+    source: serde_json::Value,
+    snapshot: DiaryPullSnapshot,
+}
+
+#[derive(Debug, Deserialize)]
+struct DiaryPullSnapshot {
+    digest_algorithm: String,
+    digest: String,
+    conversations: Vec<DiaryPullConversation>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DiaryPullConversation {
+    folder: String,
+    source: serde_json::Value,
+    snapshot: Snapshot,
+}
+
+pub fn run_import(publication_id: &str, diary: bool, registry: &str) {
+    if diary {
+        match fetch_diary_pull_package(publication_id, registry).and_then(|package| {
+            let receipt = package.receipt.clone();
+            let count = install_diary_pull_package(Path::new("."), package)?;
+            crate::commands::publish::save_imported_diary_cursor(
+                Path::new("."),
+                registry,
+                &receipt.publication_id,
+                &receipt.revision_id,
+                &receipt.registry_id,
+                &receipt.snapshot_digest,
+                &receipt.pulled_at,
+            )?;
+            Ok(count)
+        })
+        {
+            Ok(count) => {
+                println!("✔ Imported registry diary into ./chats");
+                println!("  Conversations: {}", count);
+                println!("  Rebuilt:       ./.fur");
+            }
+            Err(error) => eprintln!("❌ Registry diary import failed: {}", error),
+        }
+        return;
+    }
     match fetch_pull_package(publication_id, registry)
         .and_then(|package| install_pull_package(Path::new("."), package))
     {
@@ -70,6 +129,148 @@ pub fn run_import(publication_id: &str, registry: &str) {
         }
         Err(error) => eprintln!("❌ Registry import failed: {}", error),
     }
+}
+
+#[allow(dead_code)]
+pub fn install_diary_pull_value(
+    root: &Path,
+    value: serde_json::Value,
+) -> Result<usize, String> {
+    let package: DiaryPullPackage = serde_json::from_value(value)
+        .map_err(|e| format!("invalid diary pull response: {}", e))?;
+    install_diary_pull_package(root, package)
+}
+
+fn fetch_diary_pull_package(
+    publication_id: &str,
+    registry: &str,
+) -> Result<DiaryPullPackage, String> {
+    let url = format!(
+        "{}/api/v2/diaries/{}/pull",
+        registry.trim_end_matches('/'),
+        publication_id
+    );
+    let response = reqwest::blocking::get(&url)
+        .map_err(|e| format!("cannot reach {}: {}", url, e))?;
+    if !response.status().is_success() {
+        return Err(format!("registry returned HTTP {}", response.status()));
+    }
+    let package = response
+        .json::<DiaryPullPackage>()
+        .map_err(|e| format!("invalid diary pull response: {}", e))?;
+    if package.receipt.publication_id != publication_id {
+        return Err("registry returned a different diary publication id".to_string());
+    }
+    Ok(package)
+}
+
+fn install_diary_pull_package(root: &Path, package: DiaryPullPackage) -> Result<usize, String> {
+    if root.join("chats").exists() || root.join(".fur").exists() {
+        return Err(
+            "diary import requires an empty destination without chats/ or .fur/".to_string(),
+        );
+    }
+    if package.pull_schema != "fur.registry.diary.pull.v1"
+        || package.receipt.receipt_schema != "fur.registry.diary.origin.v1"
+        || package.receipt.origin_kind != "registry-diary"
+    {
+        return Err("invalid registry diary pull envelope".to_string());
+    }
+    if package.snapshot.digest_algorithm != "sha256-diary-manifest-v1" {
+        return Err(format!(
+            "unsupported diary digest algorithm: {}",
+            package.snapshot.digest_algorithm
+        ));
+    }
+
+    let expected_diary_digest = package.snapshot.digest.clone();
+    let mut validated = Vec::new();
+    let mut seen_folders = std::collections::BTreeSet::new();
+    let mut seen_conversations = std::collections::BTreeSet::new();
+    for conversation in package.snapshot.conversations {
+        validate_relative_path(&conversation.folder)?;
+        if conversation.folder.contains('/') || !seen_folders.insert(conversation.folder.clone()) {
+            return Err(format!("invalid or duplicate diary folder: {}", conversation.folder));
+        }
+        let source_id = conversation.source["conversation_id"]
+            .as_str()
+            .ok_or("diary conversation source has no conversation_id")?
+            .to_string();
+        if !seen_conversations.insert(source_id.clone()) {
+            return Err(format!("duplicate diary conversation id: {}", source_id));
+        }
+        let pull = PullPackage {
+            pull_schema: "fur.registry.pull.v1".to_string(),
+            receipt: OriginReceipt {
+                receipt_schema: "fur.registry.origin.v1".to_string(),
+                origin_kind: "registry-publication".to_string(),
+                registry_id: package.receipt.registry_id.clone(),
+                publication_id: package.receipt.publication_id.clone(),
+                revision_id: package.receipt.revision_id.clone(),
+                source_conversation_id: source_id,
+                snapshot_digest: conversation.snapshot.digest.clone(),
+                pulled_at: package.receipt.pulled_at.clone(),
+            },
+            snapshot: conversation.snapshot,
+        };
+        validated.push((conversation.folder, validate_pull_package(pull)?));
+    }
+    if validated.is_empty() {
+        return Err("diary pull contains no conversations".to_string());
+    }
+
+    let digest = diary_pull_digest(&validated);
+    if digest != expected_diary_digest || digest != package.receipt.snapshot_digest {
+        return Err("diary snapshot digest does not match its manifest or receipt".to_string());
+    }
+
+    let staging = root.join(format!(".fur-diary-import-{}", Uuid::new_v4()));
+    fs::create_dir_all(staging.join("chats"))
+        .map_err(|e| format!("cannot create diary import staging: {}", e))?;
+    let result = (|| {
+        for (folder, conversation) in &validated {
+            let target = staging.join("chats").join(folder);
+            fs::create_dir_all(&target)
+                .map_err(|e| format!("cannot create {}: {}", target.display(), e))?;
+            write_staged_import(&target, conversation)?;
+        }
+        rebuild(&staging, false)?;
+        let receipt_path = staging.join(".fur/registry/imported-diary.json");
+        fs::create_dir_all(receipt_path.parent().unwrap())
+            .map_err(|e| format!("cannot create diary receipt directory: {}", e))?;
+        let receipt = serde_json::to_string_pretty(&package.receipt)
+            .map_err(|e| format!("cannot serialize diary receipt: {}", e))?;
+        fs::write(&receipt_path, format!("{}\n", receipt))
+            .map_err(|e| format!("cannot write diary receipt: {}", e))?;
+        Ok::<(), String>(())
+    })();
+    if let Err(error) = result {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(error);
+    }
+
+    fs::rename(staging.join("chats"), root.join("chats"))
+        .map_err(|e| format!("cannot install diary chats/: {}", e))?;
+    if let Err(error) = fs::rename(staging.join(".fur"), root.join(".fur")) {
+        let _ = fs::rename(root.join("chats"), staging.join("chats"));
+        let _ = fs::remove_dir_all(&staging);
+        return Err(format!("cannot install rebuilt diary index: {}", error));
+    }
+    let _ = fs::remove_dir_all(&staging);
+    Ok(validated.len())
+}
+
+fn diary_pull_digest(validated: &[(String, ValidatedPull)]) -> String {
+    let mut hasher = Sha256::new();
+    for (folder, conversation) in validated {
+        hasher.update(folder.as_bytes());
+        hasher.update([0]);
+        hasher.update(conversation.doc.conversation_id.as_bytes());
+        hasher.update([0]);
+        hasher.update(conversation.package.snapshot.digest.as_bytes());
+        hasher.update(b"\n");
+    }
+    format!("{:x}", hasher.finalize())
 }
 
 /// Install an already-decoded pull response. Kept public so the protocol can

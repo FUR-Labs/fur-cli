@@ -108,3 +108,83 @@ fn tampered_snapshot_is_rejected_before_any_archive_is_written() {
     assert!(error.contains("incorrect size"));
     assert!(!Path::new(tmp.path()).join("chats").exists());
 }
+
+fn diary_package() -> serde_json::Value {
+    let conversation = package();
+    let folder = "imported-research-11111111";
+    let conversation_id = conversation["receipt"]["source_conversation_id"]
+        .as_str()
+        .unwrap();
+    let conversation_digest = conversation["snapshot"]["digest"].as_str().unwrap();
+    let mut manifest = Sha256::new();
+    manifest.update(folder.as_bytes());
+    manifest.update([0]);
+    manifest.update(conversation_id.as_bytes());
+    manifest.update([0]);
+    manifest.update(conversation_digest.as_bytes());
+    manifest.update(b"\n");
+    let diary_digest = format!("{:x}", manifest.finalize());
+
+    json!({
+        "pull_schema": "fur.registry.diary.pull.v1",
+        "receipt": {
+            "receipt_schema": "fur.registry.diary.origin.v1",
+            "origin_kind": "registry-diary",
+            "registry_id": "registry.test",
+            "publication_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "revision_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            "snapshot_digest": diary_digest,
+            "pulled_at": "2026-08-12T03:00:00Z"
+        },
+        "source": {
+            "format": "fur.project-directory",
+            "suggested_name": "research"
+        },
+        "snapshot": {
+            "digest_algorithm": "sha256-diary-manifest-v1",
+            "digest": diary_digest,
+            "conversations": [{
+                "folder": folder,
+                "source": {
+                    "format": "fur.conversation-directory",
+                    "fur_document_schema": 1,
+                    "conversation_id": conversation_id,
+                    "origin_kind": "local"
+                },
+                "snapshot": conversation["snapshot"].clone()
+            }]
+        }
+    })
+}
+
+#[test]
+fn complete_diary_import_is_rebuilt_without_canonical_diary_metadata() {
+    let tmp = tempdir().unwrap();
+
+    let count = fur_cli::commands::registry::install_diary_pull_value(
+        tmp.path(),
+        diary_package(),
+    )
+    .unwrap();
+
+    assert_eq!(count, 1);
+    assert!(tmp.path().join("chats/imported-research-11111111/convo.md").exists());
+    assert!(tmp.path().join(".fur/index.json").exists());
+    assert!(tmp.path().join(".fur/registry/imported-diary.json").exists());
+    assert!(!tmp.path().join("chats/.fur-diary.json").exists());
+}
+
+#[test]
+fn tampered_diary_is_rejected_before_any_project_is_installed() {
+    let tmp = tempdir().unwrap();
+    let mut value = diary_package();
+    value["snapshot"]["conversations"][0]["snapshot"]["files"][0]["content"] =
+        json!("tampered");
+
+    let error = fur_cli::commands::registry::install_diary_pull_value(tmp.path(), value)
+        .unwrap_err();
+
+    assert!(error.contains("incorrect size"));
+    assert!(!tmp.path().join("chats").exists());
+    assert!(!tmp.path().join(".fur").exists());
+}
