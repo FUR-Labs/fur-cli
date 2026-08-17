@@ -25,6 +25,7 @@ use crate::commands::{
     export::{self, ExportArgs},
     jot::{self, JotArgs},
     jump::{self, JumpArgs},
+    link::{self, LinkArgs},
     message::{self, MsgArgs},
     new,
     onboard::{self, OnboardArgs},
@@ -108,6 +109,12 @@ enum Commands {
 
     #[command(about = "Everyday:: Edit or Delete a jotted message")]
     Msg(MsgArgs),
+
+    #[command(about = "Everyday:: Record that a conversation derives from another")]
+    Link(LinkArgs),
+
+    #[command(about = "Everyday:: Remove a conversation lineage edge")]
+    Unlink(LinkArgs),
 
     #[command(about = "Everyday:: Show full conversation (replaces timeline --verbose)")]
     Show(TimelineArgs),
@@ -349,6 +356,10 @@ fn main() {
         Commands::Chat { avatar } => chat::run_chat(avatar),
 
         Commands::Msg(a) => message::run_msg(a),
+
+        Commands::Link(a) => link::run_link(a),
+
+        Commands::Unlink(a) => link::run_unlink(a),
 
         Commands::Timeline(a) => timeline::run_timeline(a),
 
