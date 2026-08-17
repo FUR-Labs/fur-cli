@@ -37,14 +37,9 @@ pub fn document_from_thread(fur_dir: &Path, tid: &str) -> Result<FurDocument, St
         convo["created_at"].as_str().unwrap_or(""),
     );
 
-    doc.tags = convo["tags"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
+    doc.tags = string_list(&convo, "tags");
+    doc.parents = string_list(&convo, "parents");
+    doc.children = string_list(&convo, "children");
 
     let msg_ids: Vec<String> = convo["messages"]
         .as_array()
@@ -417,6 +412,23 @@ fn hash_file(path: &Path) -> Option<String> {
     hasher.update(&bytes);
 
     Some(format!("{:x}", hasher.finalize()))
+}
+
+/// Read a JSON array of strings, treating an absent key as an empty list.
+///
+/// extracted from `document_from_thread`, which had this shape
+/// inline for `tags` and now needs it three times. Absence is deliberately
+/// not an error — thread files written before lineage existed carry no
+/// `parents`/`children`, and they are simply conversations with no edges yet.
+fn string_list(value: &Value, key: &str) -> Vec<String> {
+    value[key]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {

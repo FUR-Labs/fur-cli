@@ -366,6 +366,8 @@ fn write_thread(fur_dir: &Path, doc: &FurDocument) -> Result<(), String> {
         "created_at": doc.created_at,
         "messages": doc.messages.iter().map(|m| m.id.clone()).collect::<Vec<_>>(),
         "tags": doc.tags,
+        "parents": doc.parents,
+        "children": doc.children,
         "title": doc.title,
         "schema_version": SCHEMA_VERSION
     });

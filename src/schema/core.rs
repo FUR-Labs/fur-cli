@@ -74,6 +74,8 @@ pub fn make_conversation_metadata(title: &str, id: &str) -> Value {
         "created_at": Utc::now().to_rfc3339(),
         "messages": [],
         "tags": [],
+        "parents": [],
+        "children": [],
         "title": title,
         "schema_version": SCHEMA_VERSION
     })
