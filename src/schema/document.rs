@@ -1,8 +1,8 @@
 //! Canonical FUR conversation document: serialize / parse.
 //!
-//! Phase A: `.fur/` is still canonical. This module only proves that a
-//! conversation can round-trip losslessly through a human-readable Markdown
-//! document, so that `chats/` can later become the source of truth.
+//! `.fur/` is operational state. This module defines the durable format: a
+//! conversation is a Markdown file that a person can read and a machine can
+//! parse, and `tests/roundtrip.rs` proves the trip is lossless.
 //!
 //! On-disk layout this format assumes:
 //!
@@ -16,13 +16,44 @@
 //! `link=` is always relative to the conversation folder that holds the spine.
 //! Long-form siblings carry no metadata of their own; the folder is the unit of
 //! self-containment.
+//!
+//! # Lineage (schema 2)
+//!
+//! `parents` and `children` record edges to *other conversations*, by
+//! `conversation_id`. Together they form a directed graph across the archive:
+//! a methodology discussion informs a forecast, which informs a revision.
+//!
+//! Three properties are deliberate, and each has a reason:
+//!
+//! - **Edges are ids, never folder slugs.** `bridge::slug_for` embeds the
+//!   title, and `sync_conversation` renames the folder when the title changes.
+//!   A slug-based edge would break on the first rename, and would not survive
+//!   registry import at all.
+//! - **Dangling edges are legal.** A conversation imported from a registry can
+//!   reference conversations the importer has never seen. An unresolvable edge
+//!   is *partial knowledge*, not corruption — unlike a missing `link=` file,
+//!   which is a broken document.
+//! - **Cycles are legal here, and handled by traversal.** Two people can
+//!   independently publish A→B and B→A; the cycle only exists once both are in
+//!   one archive. Rejecting it at parse time would make that archive
+//!   unrepresentable. Every walker carries a visited set — which it needs for
+//!   diamonds regardless.
+//!
+//! Self-reference *is* rejected: it is never meaningful and always a mistake.
 
 use std::fmt::Write as _;
 
 /// Version of the *document* format. Deliberately an integer, and deliberately
 /// separate from `schema::SCHEMA_VERSION` (which versions the `.fur/` JSON).
 /// Integers also avoid the lexicographic trap of comparing "0.10" to "0.3".
-pub const FUR_DOC_SCHEMA: u32 = 1;
+///
+/// 1 → 2: added `parents` / `children`, and inline flow sequences in front
+/// matter. A schema-1 build rejects unknown front-matter keys outright, so
+/// documents carrying lineage must announce themselves as 2.
+pub const FUR_DOC_SCHEMA: u32 = 2;
+
+/// Oldest document version this build still reads.
+pub const FUR_DOC_SCHEMA_MIN: u32 = 1;
 
 const MARKER_OPEN: &str = "<!-- fur:msg";
 const MARKER_CLOSE: &str = "-->";
@@ -73,9 +104,9 @@ impl FurMessage {
 
 /// A whole conversation: front matter plus an ordered list of messages.
 ///
-/// There is no `parent` field yet — absence means the conversation is flat.
-/// When branching is switched on, `parent=<id>` appears on messages that have
-/// one and every document written today stays valid.
+/// Messages are flat and their order is positional — the order they appear in
+/// the document *is* the sequence. Structure between conversations lives in
+/// `parents` / `children`; there is no structure within one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FurDocument {
     pub schema: u32,
@@ -84,6 +115,10 @@ pub struct FurDocument {
     pub created_at: String,
     pub updated_at: Option<String>,
     pub tags: Vec<String>,
+    /// Conversations this one draws on, by `conversation_id`.
+    pub parents: Vec<String>,
+    /// Conversations that draw on this one, by `conversation_id`.
+    pub children: Vec<String>,
     pub messages: Vec<FurMessage>,
 }
 
@@ -100,9 +135,82 @@ impl FurDocument {
             created_at: created_at.into(),
             updated_at: None,
             tags: Vec::new(),
+            parents: Vec::new(),
+            children: Vec::new(),
             messages: Vec::new(),
         }
     }
+
+    /// Version this document must be written as.
+    ///
+    /// A schema-1 document with no lineage stays schema 1, so archives written
+    /// before this change re-serialize byte-identically. The moment it gains an
+    /// edge it becomes schema 2, because a schema-1 reader would reject the new
+    /// keys as unknown rather than reporting a version it cannot handle.
+    pub fn effective_schema(&self) -> u32 {
+        if self.parents.is_empty() && self.children.is_empty() {
+            self.schema
+        } else {
+            self.schema.max(2)
+        }
+    }
+
+    /// Check the invariants `parse` enforces, for code that builds documents in
+    /// memory rather than reading them.
+    ///
+    /// `serialize` does not validate — it is infallible by design — so a
+    /// command that mutates lineage should call this before writing.
+    pub fn validate(&self) -> Result<(), String> {
+        check_refs(&self.parents, &self.conversation_id, "parents")?;
+        check_refs(&self.children, &self.conversation_id, "children")?;
+
+        let mut seen: Vec<&str> = Vec::with_capacity(self.messages.len());
+        for msg in &self.messages {
+            if msg.id.is_empty() {
+                return Err("message has an empty id".to_string());
+            }
+            if seen.contains(&msg.id.as_str()) {
+                return Err(format!("duplicate message id '{}'", msg.id));
+            }
+            seen.push(&msg.id);
+        }
+
+        Ok(())
+    }
+}
+
+// ======================================================
+//  LINEAGE HELPERS
+// ======================================================
+
+/// Reject the things that are never meaningful, whatever the source.
+///
+/// Dangling and cyclic references pass: see the module docs for why.
+fn check_refs(refs: &[String], conversation_id: &str, field: &str) -> Result<(), String> {
+    for reference in refs {
+        if reference.trim().is_empty() {
+            return Err(format!("empty conversation reference in '{}'", field));
+        }
+        if reference == conversation_id {
+            return Err(format!(
+                "conversation {} lists itself in '{}'",
+                conversation_id, field
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Sort and de-duplicate, so the same edge set always produces the same bytes.
+///
+/// viceroy: this is what makes concurrent edits merge cleanly. Two people
+/// adding different parents to the same document produce a Git conflict whose
+/// resolution is a union, in an order neither of them chose.
+fn canonical_refs(refs: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = refs.iter().map(|r| r.trim().to_string()).collect();
+    out.sort();
+    out.dedup();
+    out
 }
 
 // ======================================================
@@ -113,26 +221,21 @@ impl FurDocument {
 ///
 /// Canonical means byte-stable: `serialize(parse(serialize(d))) == serialize(d)`.
 /// That property is what `tests/roundtrip.rs` checks, and it is the whole point
-/// of Phase A.
+/// of the storage inversion.
 pub fn serialize(doc: &FurDocument) -> String {
     let mut out = String::new();
 
     out.push_str("---\n");
-    let _ = writeln!(out, "fur_schema: {}", doc.schema);
+    let _ = writeln!(out, "fur_schema: {}", doc.effective_schema());
     let _ = writeln!(out, "conversation_id: {}", yaml_scalar(&doc.conversation_id));
     let _ = writeln!(out, "title: {}", yaml_scalar(&doc.title));
     let _ = writeln!(out, "created_at: {}", yaml_scalar(&doc.created_at));
     if let Some(updated) = &doc.updated_at {
         let _ = writeln!(out, "updated_at: {}", yaml_scalar(updated));
     }
-    if doc.tags.is_empty() {
-        out.push_str("tags: []\n");
-    } else {
-        out.push_str("tags:\n");
-        for tag in &doc.tags {
-            let _ = writeln!(out, "  - {}", yaml_scalar(tag));
-        }
-    }
+    write_scalar_list(&mut out, "tags", &doc.tags);
+    write_scalar_list(&mut out, "parents", &canonical_refs(&doc.parents));
+    write_scalar_list(&mut out, "children", &canonical_refs(&doc.children));
     out.push_str("---\n");
 
     for msg in &doc.messages {
@@ -149,6 +252,23 @@ pub fn serialize(doc: &FurDocument) -> String {
     }
 
     out
+}
+
+/// Empty lists render inline as `[]`; non-empty ones as a block sequence.
+///
+/// The keys are always emitted, empty or not. They are part of the format's
+/// visible surface: someone hand-editing a `convo.md` should be able to see
+/// that lineage exists and fill it in without consulting documentation.
+fn write_scalar_list(out: &mut String, key: &str, values: &[String]) {
+    if values.is_empty() {
+        let _ = writeln!(out, "{}: []", key);
+        return;
+    }
+
+    let _ = writeln!(out, "{}:", key);
+    for value in values {
+        let _ = writeln!(out, "  - {}", yaml_scalar(value));
+    }
 }
 
 fn render_marker(msg: &FurMessage) -> String {
@@ -204,7 +324,8 @@ fn yaml_scalar(raw: &str) -> String {
             .chars()
             .all(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.' | '+' | ':' | '/'))
         && !raw.contains(": ")
-        && !raw.starts_with('-');
+        && !raw.starts_with('-')
+        && !raw.starts_with('[');
 
     if safe {
         return raw.to_string();
@@ -263,6 +384,36 @@ fn is_escapable_marker_line(line: &str) -> bool {
 //  PARSE
 // ======================================================
 
+/// Which block sequence the front-matter parser is currently inside.
+///
+/// viceroy: this replaces the `in_tags` boolean, which could only ever track
+/// one list. Three keys now take sequences.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ListKey {
+    Tags,
+    Parents,
+    Children,
+}
+
+impl ListKey {
+    fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "tags" => Some(ListKey::Tags),
+            "parents" => Some(ListKey::Parents),
+            "children" => Some(ListKey::Children),
+            _ => None,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            ListKey::Tags => "tags",
+            ListKey::Parents => "parents",
+            ListKey::Children => "children",
+        }
+    }
+}
+
 /// Parse a canonical document. Errors are strings so this can sit under the
 /// existing `eprintln!` style without dragging in an error crate.
 pub fn parse(text: &str) -> Result<FurDocument, String> {
@@ -272,16 +423,12 @@ pub fn parse(text: &str) -> Result<FurDocument, String> {
     let mut doc = parse_front_matter(&front_matter)?;
     doc.messages = parse_messages(&lines[body_start..])?;
 
-    let mut seen: Vec<&str> = Vec::with_capacity(doc.messages.len());
-    for msg in &doc.messages {
-        if msg.id.is_empty() {
-            return Err("message marker has an empty id".to_string());
-        }
-        if seen.contains(&msg.id.as_str()) {
-            return Err(format!("duplicate message id '{}'", msg.id));
-        }
-        seen.push(&msg.id);
-    }
+    // Canonicalise on read as well as on write, so a hand-edited document with
+    // duplicate or unsorted edges still satisfies `parse(serialize(d)) == d`.
+    doc.parents = canonical_refs(&doc.parents);
+    doc.children = canonical_refs(&doc.children);
+
+    doc.validate()?;
 
     Ok(doc)
 }
@@ -308,7 +455,9 @@ fn parse_front_matter(lines: &[&str]) -> Result<FurDocument, String> {
     let mut created_at: Option<String> = None;
     let mut updated_at: Option<String> = None;
     let mut tags: Vec<String> = Vec::new();
-    let mut in_tags = false;
+    let mut parents: Vec<String> = Vec::new();
+    let mut children: Vec<String> = Vec::new();
+    let mut current_list: Option<ListKey> = None;
 
     for line in lines {
         if line.trim().is_empty() {
@@ -316,10 +465,15 @@ fn parse_front_matter(lines: &[&str]) -> Result<FurDocument, String> {
         }
 
         if let Some(item) = line.trim_start().strip_prefix("- ") {
-            if !in_tags {
+            let Some(list) = current_list else {
                 return Err(format!("unexpected list item in front matter: {}", line));
+            };
+            let value = unquote_scalar(item.trim());
+            match list {
+                ListKey::Tags => tags.push(value),
+                ListKey::Parents => parents.push(value),
+                ListKey::Children => children.push(value),
             }
-            tags.push(unquote_scalar(item.trim()));
             continue;
         }
 
@@ -329,7 +483,25 @@ fn parse_front_matter(lines: &[&str]) -> Result<FurDocument, String> {
 
         let key = key.trim();
         let value = value.trim();
-        in_tags = false;
+        current_list = None;
+
+        if let Some(list) = ListKey::from_key(key) {
+            let target = match list {
+                ListKey::Tags => &mut tags,
+                ListKey::Parents => &mut parents,
+                ListKey::Children => &mut children,
+            };
+
+            if value.is_empty() {
+                // A block sequence follows on the next lines.
+                current_list = Some(list);
+            } else if value.starts_with('[') && value.ends_with(']') {
+                *target = parse_flow_sequence(&value[1..value.len() - 1], list.name())?;
+            } else {
+                return Err(format!("unsupported value for '{}': '{}'", list.name(), value));
+            }
+            continue;
+        }
 
         match key {
             "fur_schema" => {
@@ -343,13 +515,6 @@ fn parse_front_matter(lines: &[&str]) -> Result<FurDocument, String> {
             "title" => title = Some(unquote_scalar(value)),
             "created_at" => created_at = Some(unquote_scalar(value)),
             "updated_at" => updated_at = Some(unquote_scalar(value)),
-            "tags" => {
-                if value == "[]" || value.is_empty() {
-                    in_tags = value.is_empty();
-                } else {
-                    return Err(format!("unsupported inline tags value: '{}'", value));
-                }
-            }
             _ => return Err(format!("unknown front matter key: '{}'", key)),
         }
     }
@@ -361,6 +526,12 @@ fn parse_front_matter(lines: &[&str]) -> Result<FurDocument, String> {
             schema, FUR_DOC_SCHEMA
         ));
     }
+    if schema < FUR_DOC_SCHEMA_MIN {
+        return Err(format!(
+            "document schema {} is older than this build supports ({})",
+            schema, FUR_DOC_SCHEMA_MIN
+        ));
+    }
 
     Ok(FurDocument {
         schema,
@@ -369,8 +540,80 @@ fn parse_front_matter(lines: &[&str]) -> Result<FurDocument, String> {
         created_at: created_at.ok_or("front matter missing 'created_at'")?,
         updated_at,
         tags,
+        parents,
+        children,
         messages: Vec::new(),
     })
+}
+
+/// Parse the inside of a `[a, b, "c d"]` flow sequence.
+///
+/// viceroy: schema 1 accepted only the literal `[]` and errored on anything
+/// else inline. Lineage lists are short and read far better on one line in a
+/// diff, so the real thing is parsed now — for `tags` too, which previously
+/// forced block style the moment it had a single entry.
+fn parse_flow_sequence(inner: &str, field: &str) -> Result<Vec<String>, String> {
+    let trimmed = inner.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let chars: Vec<char> = trimmed.chars().collect();
+    let mut out = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    let mut closed_quote = false;
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+
+        if quoted {
+            if c == '\\' && i + 1 < chars.len() {
+                current.push(chars[i + 1]);
+                i += 2;
+                continue;
+            }
+            if c == '"' {
+                quoted = false;
+                closed_quote = true;
+                i += 1;
+                continue;
+            }
+            current.push(c);
+            i += 1;
+            continue;
+        }
+
+        match c {
+            '"' if current.trim().is_empty() && !closed_quote => {
+                current.clear();
+                quoted = true;
+                i += 1;
+            }
+            ',' => {
+                out.push(std::mem::take(&mut current).trim().to_string());
+                closed_quote = false;
+                i += 1;
+            }
+            _ => {
+                current.push(c);
+                i += 1;
+            }
+        }
+    }
+
+    if quoted {
+        return Err(format!("unterminated quoted value in '{}'", field));
+    }
+
+    out.push(current.trim().to_string());
+
+    if out.iter().any(|v| v.is_empty()) {
+        return Err(format!("empty entry in '{}' list", field));
+    }
+
+    Ok(out)
 }
 
 fn parse_messages(lines: &[&str]) -> Result<Vec<FurMessage>, String> {
@@ -551,6 +794,11 @@ fn unquote_scalar(raw: &str) -> String {
 mod tests {
     use super::*;
 
+    const A: &str = "aaaaaaaa-1111-4111-8111-111111111111";
+    const B: &str = "bbbbbbbb-2222-4222-8222-222222222222";
+    const C: &str = "cccccccc-3333-4333-8333-333333333333";
+    const D: &str = "dddddddd-4444-4444-8444-444444444444";
+
     fn sample() -> FurDocument {
         let mut doc = FurDocument::new(
             "8f0c4a2e-1b3d-4f5a-9c7e-2d8b6a1f0e33",
@@ -569,11 +817,16 @@ mod tests {
         doc
     }
 
+    fn round_trips(doc: &FurDocument) -> FurDocument {
+        let once = serialize(doc);
+        let parsed = parse(&once).expect("parses");
+        assert_eq!(once, serialize(&parsed), "serialization is not idempotent");
+        parsed
+    }
+
     #[test]
     fn round_trip_is_byte_stable() {
-        let once = serialize(&sample());
-        let parsed = parse(&once).expect("parses");
-        assert_eq!(once, serialize(&parsed));
+        let parsed = round_trips(&sample());
         assert_eq!(sample(), parsed);
     }
 
@@ -583,12 +836,9 @@ mod tests {
         let evil = "Here is the format:\n<!-- fur:msg id=fake avatar=x ts=y -->\ndone";
         doc.messages = vec![FurMessage::new("m1", "andrew", "2026-08-08T00:00:00Z").with_body(evil)];
 
-        let text = serialize(&doc);
-        let parsed = parse(&text).expect("parses");
-
+        let parsed = round_trips(&doc);
         assert_eq!(parsed.messages.len(), 1);
         assert_eq!(parsed.messages[0].body, evil);
-        assert_eq!(text, serialize(&parsed));
     }
 
     #[test]
@@ -610,17 +860,157 @@ mod tests {
         doc.messages = vec![FurMessage::new("m1", "karen from hr", "2026-08-08T00:00:00Z")
             .with_link("CHAT with spaces.md", None)];
 
-        let text = serialize(&doc);
-        let parsed = parse(&text).expect("parses");
-
+        let parsed = round_trips(&doc);
         assert_eq!(parsed.title, "Title: with punctuation");
         assert_eq!(parsed.messages[0].avatar, "karen from hr");
         assert_eq!(parsed.messages[0].link.as_deref(), Some("CHAT with spaces.md"));
-        assert_eq!(text, serialize(&parsed));
     }
 
     #[test]
     fn missing_front_matter_is_an_error() {
         assert!(parse("just some markdown\n").is_err());
+    }
+
+    // ---------- lineage ----------
+
+    #[test]
+    fn lineage_round_trips() {
+        let mut doc = FurDocument::new(A, "Business plan", "2026-08-17T00:14:20Z");
+        doc.children = vec![B.to_string(), C.to_string()];
+
+        let parsed = round_trips(&doc);
+        assert_eq!(parsed.children, vec![B.to_string(), C.to_string()]);
+        assert!(parsed.parents.is_empty());
+        assert_eq!(parsed.schema, 2);
+    }
+
+    #[test]
+    fn lineage_is_sorted_and_deduplicated() {
+        let mut doc = FurDocument::new(A, "Unsorted", "2026-08-17T00:14:20Z");
+        doc.parents = vec![C.to_string(), B.to_string(), C.to_string()];
+
+        let parsed = round_trips(&doc);
+        assert_eq!(parsed.parents, vec![B.to_string(), C.to_string()]);
+    }
+
+    #[test]
+    fn self_reference_is_rejected() {
+        let mut doc = FurDocument::new(A, "Ouroboros", "2026-08-17T00:14:20Z");
+        doc.parents = vec![A.to_string()];
+
+        let err = parse(&serialize(&doc)).unwrap_err();
+        assert!(err.contains("lists itself"), "got: {}", err);
+    }
+
+    #[test]
+    fn dangling_references_are_legal() {
+        let mut doc = FurDocument::new(A, "Imported alone", "2026-08-17T00:14:20Z");
+        doc.parents = vec!["ffffffff-0000-4000-8000-000000000000".to_string()];
+
+        let parsed = round_trips(&doc);
+        assert_eq!(parsed.parents.len(), 1);
+    }
+
+    #[test]
+    fn a_cycle_between_two_documents_is_representable() {
+        let mut first = FurDocument::new(A, "First", "2026-08-17T00:14:20Z");
+        first.children = vec![B.to_string()];
+        let mut second = FurDocument::new(B, "Second", "2026-08-17T00:15:20Z");
+        second.children = vec![A.to_string()];
+
+        // Neither document is invalid on its own; the cycle only exists in the
+        // union, and traversal is what has to cope with it.
+        assert_eq!(round_trips(&first).children, vec![B.to_string()]);
+        assert_eq!(round_trips(&second).children, vec![A.to_string()]);
+    }
+
+    #[test]
+    fn a_diamond_is_representable() {
+        let mut top = FurDocument::new(A, "Top", "2026-08-17T00:14:20Z");
+        top.children = vec![B.to_string(), C.to_string()];
+
+        let mut bottom = FurDocument::new(D, "Bottom", "2026-08-17T00:17:20Z");
+        bottom.parents = vec![B.to_string(), C.to_string()];
+
+        assert_eq!(round_trips(&top).children.len(), 2);
+        assert_eq!(round_trips(&bottom).parents.len(), 2);
+    }
+
+    #[test]
+    fn inline_flow_sequences_parse() {
+        let text = format!(
+            "---\nfur_schema: 2\nconversation_id: {}\ntitle: Flow\ncreated_at: 2026-08-17T00:14:20Z\ntags: [research, \"deep learning\"]\nparents: [{}]\nchildren: []\n---\n",
+            A, B
+        );
+
+        let doc = parse(&text).expect("parses");
+        assert_eq!(doc.tags, vec!["research".to_string(), "deep learning".to_string()]);
+        assert_eq!(doc.parents, vec![B.to_string()]);
+        assert!(doc.children.is_empty());
+    }
+
+    #[test]
+    fn block_and_flow_forms_agree() {
+        let flow = format!(
+            "---\nfur_schema: 2\nconversation_id: {}\ntitle: Same\ncreated_at: 2026-08-17T00:14:20Z\ntags: []\nparents: [{}, {}]\nchildren: []\n---\n",
+            A, B, C
+        );
+        let block = format!(
+            "---\nfur_schema: 2\nconversation_id: {}\ntitle: Same\ncreated_at: 2026-08-17T00:14:20Z\ntags: []\nparents:\n  - {}\n  - {}\nchildren: []\n---\n",
+            A, B, C
+        );
+
+        assert_eq!(parse(&flow).unwrap(), parse(&block).unwrap());
+        assert_eq!(serialize(&parse(&flow).unwrap()), serialize(&parse(&block).unwrap()));
+    }
+
+    #[test]
+    fn schema_one_documents_still_parse() {
+        let text = format!(
+            "---\nfur_schema: 1\nconversation_id: {}\ntitle: Old\ncreated_at: 2026-08-08T18:11:40-05:00\ntags: []\n---\n\n<!-- fur:msg id=m1 avatar=andrew ts=2026-08-08T18:11:40-05:00 -->\n\nhello\n",
+            A
+        );
+
+        let doc = parse(&text).expect("parses");
+        assert_eq!(doc.schema, 1);
+        assert!(doc.parents.is_empty());
+        assert_eq!(doc.messages.len(), 1);
+    }
+
+    #[test]
+    fn a_schema_one_document_without_lineage_stays_schema_one() {
+        let mut doc = FurDocument::new(A, "Old", "2026-08-08T18:11:40-05:00");
+        doc.schema = 1;
+        assert!(serialize(&doc).contains("fur_schema: 1"));
+    }
+
+    #[test]
+    fn adding_lineage_upgrades_the_document() {
+        let mut doc = FurDocument::new(A, "Old", "2026-08-08T18:11:40-05:00");
+        doc.schema = 1;
+        doc.parents = vec![B.to_string()];
+        assert!(serialize(&doc).contains("fur_schema: 2"));
+    }
+
+    #[test]
+    fn a_future_schema_is_refused_by_version_not_by_key() {
+        let text = format!(
+            "---\nfur_schema: 3\nconversation_id: {}\ntitle: Future\ncreated_at: 2026-08-17T00:14:20Z\ntags: []\n---\n",
+            A
+        );
+
+        let err = parse(&text).unwrap_err();
+        assert!(err.contains("newer than this build"), "got: {}", err);
+    }
+
+    #[test]
+    fn an_empty_reference_is_rejected() {
+        let text = format!(
+            "---\nfur_schema: 2\nconversation_id: {}\ntitle: Empty ref\ncreated_at: 2026-08-17T00:14:20Z\ntags: []\nparents: [{}, ]\nchildren: []\n---\n",
+            A, B
+        );
+
+        let err = parse(&text).unwrap_err();
+        assert!(err.contains("empty entry"), "got: {}", err);
     }
 }
