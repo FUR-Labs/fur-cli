@@ -23,6 +23,7 @@ use crate::commands::{
     avatar, chat, clone, conversation,
     doctor::{self, DoctorArgs},
     export::{self, ExportArgs},
+    graph::{self, GraphArgs},
     jot::{self, JotArgs},
     jump::{self, JumpArgs},
     link::{self, LinkArgs},
@@ -236,6 +237,9 @@ enum Commands {
     #[command(about = "Management:: Tree of full conversation")]
     Tree(TreeArgs),
 
+    #[command(about = "Management:: Export conversation lineage as JSON")]
+    Graph(GraphArgs),
+
     #[command(about = "Management:: Scan for FUR projects beneath the current directory")]
     Scan {
         /// Maximum recursion depth
@@ -447,6 +451,8 @@ fn main() {
         }
 
         Commands::Tree(a) => tree::run_tree(a),
+
+        Commands::Graph(a) => graph::run_graph(a),
         Commands::Search(a) => search::run_search(a),
         Commands::Export(a) => export::run_export(a),
 

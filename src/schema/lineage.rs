@@ -286,6 +286,27 @@ impl Lineage {
             .unwrap_or_default()
     }
 
+    /// Every local conversation, sorted.
+    pub fn ids(&self) -> Vec<String> {
+        self.titles.keys().cloned().collect()
+    }
+
+    /// Parents of `id`, including ones this project does not hold.
+    pub fn all_parents(&self, id: &str) -> Vec<String> {
+        self.parents
+            .get(id)
+            .map(|set| set.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Children of `id`, including ones this project does not hold.
+    pub fn all_children(&self, id: &str) -> Vec<String> {
+        self.children
+            .get(id)
+            .map(|set| set.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
     /// Edges between two local conversations asserted from one side only.
     ///
     /// Compares the raw claims, never the union — in the union a one-sided

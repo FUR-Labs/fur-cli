@@ -4,6 +4,7 @@ pub mod clone;
 pub mod conversation;
 pub mod doctor;
 pub mod export;
+pub mod graph;
 pub mod jot;
 pub mod jump;
 pub mod link;

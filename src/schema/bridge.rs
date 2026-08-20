@@ -61,7 +61,40 @@ pub fn document_from_thread(fur_dir: &Path, tid: &str) -> Result<FurDocument, St
         doc.messages.push(message_from_json(mid, &msg));
     }
 
+    doc.updated_at = latest_message_ts(&doc);
+
     Ok(doc)
+}
+
+/// Timestamp of the most recent message, when it is later than `created_at`.
+///
+/// Derived rather than clock-stamped on write: a wall-clock `updated_at` would
+/// change every time the spine is regenerated, which would break the round-trip
+/// guarantee that `chats/` can be rebuilt byte-identically from `.fur/`. "When
+/// was the last message written" is also the more useful answer than "when was
+/// this file last touched".
+fn latest_message_ts(doc: &FurDocument) -> Option<String> {
+    use chrono::DateTime;
+
+    let created = DateTime::parse_from_rfc3339(&doc.created_at).ok();
+
+    let mut best: Option<(DateTime<chrono::FixedOffset>, &str)> = None;
+
+    for msg in &doc.messages {
+        let Ok(parsed) = DateTime::parse_from_rfc3339(&msg.ts) else {
+            continue;
+        };
+        if best.map(|(t, _)| parsed > t).unwrap_or(true) {
+            best = Some((parsed, msg.ts.as_str()));
+        }
+    }
+
+    let (latest, raw) = best?;
+
+    match created {
+        Some(start) if latest <= start => None,
+        _ => Some(raw.to_string()),
+    }
 }
 
 fn message_from_json(mid: &str, msg: &Value) -> FurMessage {
