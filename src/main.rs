@@ -221,6 +221,7 @@ enum Commands {
 
     #[command(about = "Management:: Tree of full conversation")]
     Tree(TreeArgs),
+
     #[command(about = "Management:: Scan for FUR projects beneath the current directory")]
     Scan {
         /// Maximum recursion depth

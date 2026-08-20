@@ -4,9 +4,12 @@ use crate::helpers::conversation::{
 };
 use crate::helpers::tags::parse_tag_list;
 use crate::renderer::table::render_table;
+use crate::schema::lineage::Lineage;
 use chrono::{DateTime, Local, Utc};
 use clap::Parser;
+use colored::*;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -42,6 +45,22 @@ pub struct ThreadArgs {
     /// Show all conversations (no truncation)
     #[arg(long, short = 'a')]
     pub all: bool,
+
+    /// List conversations newest-first, ignoring lineage
+    #[arg(long)]
+    pub flat: bool,
+}
+
+/// One conversation's display data, gathered once and reused by both views.
+struct ConvoInfo {
+    id: String,
+    title: String,
+    created: DateTime<Utc>,
+    date_str: String,
+    time_str: String,
+    msg_count: usize,
+    size_bytes: u64,
+    tags: String,
 }
 
 pub fn run_conversation(args: ThreadArgs) {
@@ -170,142 +189,195 @@ fn handle_delete_thread(index: &mut Value, fur_dir: &Path, args: &ThreadArgs) {
     perform_conversation_deletion(index, fur_dir, &target_tid, &threads);
 }
 
+// ======================================================
+//  VIEW
+// ======================================================
+
 fn handle_view_threads(index: &Value, fur_dir: &Path, args: &ThreadArgs) {
     if !(args.view || args.id.is_none()) {
         return;
     }
 
-    let empty_vec: Vec<Value> = Vec::new();
-    let threads = index["threads"].as_array().unwrap_or(&empty_vec);
     let active = index["active_thread"].as_str().unwrap_or("");
+    let infos = collect_infos(index, fur_dir);
 
-    let mut rows = Vec::new();
-    let mut active_idx = None;
-
-    let mut total_size_bytes: u64 = 0;
-    let mut conversation_info = Vec::new();
-
-    for tid in threads {
-        if let Some(tid_str) = tid.as_str() {
-            let convo_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
-
-            if let Ok(content) = fs::read_to_string(&convo_path) {
-                if let Ok(convo) = serde_json::from_str::<Value>(&content) {
-                    let title = convo["title"].as_str().unwrap_or("Untitled").to_string();
-                    let created_raw = convo["created_at"].as_str().unwrap_or("");
-
-                    let msg_ids = convo["messages"]
-                        .as_array()
-                        .map(|a| {
-                            a.iter()
-                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default();
-
-                    let msg_count = msg_ids.len();
-
-                    let parsed = DateTime::parse_from_rfc3339(created_raw)
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .unwrap_or_else(|_| Utc::now());
-
-                    let local: DateTime<Local> = DateTime::from(parsed);
-                    let date_str = local.format("%Y-%m-%d").to_string();
-                    let time_str = local.format("%H:%M").to_string();
-
-                    let size_bytes = compute_conversation_size(fur_dir, tid_str, &msg_ids);
-                    total_size_bytes += size_bytes;
-
-                    let tags_str = convo["tags"]
-                        .as_array()
-                        .unwrap_or(&vec![])
-                        .iter()
-                        .filter_map(|v| v.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-
-                    conversation_info.push((
-                        tid_str.to_string(),
-                        title,
-                        date_str,
-                        time_str,
-                        msg_count,
-                        parsed,
-                        format_size(size_bytes),
-                        tags_str,
-                    ));
-                }
-            }
-        }
+    if infos.is_empty() {
+        println!("📭 No conversations yet. Run `fur new \"Title\"`.");
+        return;
     }
 
-    // Sort newest first
-    conversation_info.sort_by(|a, b| b.5.cmp(&a.5));
+    let total_size_bytes: u64 = infos.iter().map(|i| i.size_bytes).sum();
 
-    for (i, (tid, title, date, time, msg_count, _, size_str, tags_str)) in
-        conversation_info.iter().enumerate()
-    {
-        rows.push(vec![
-            tid[..8].to_string(),
-            title.to_string(),
-            format!("{} | {}", date, time),
-            msg_count.to_string(),
-            size_str.to_string(),
-            tags_str.to_string(),
-        ]);
+    // Neither view truncates. `--all` is kept as an accepted no-op so existing
+    // muscle memory and scripts do not break.
+    let _ = args.all;
 
-        if tid == active {
-            active_idx = Some(i);
-        }
+    if args.flat {
+        render_flat(&infos, active);
+    } else {
+        render_tree(&infos, active, fur_dir);
     }
-
-    // Apply truncation AFTER rows and active_idx exist
-    if !args.all {
-        rows = truncate_around_active(rows, active_idx);
-
-        // Recalculate active_idx inside truncated rows
-        let active_prefix = &active[..8];
-        active_idx = rows.iter().position(|row| row[0] == active_prefix);
-    }
-
-    // UPDATED HEADERS: now includes TAGS
-    render_table(
-        "Conversations",
-        &["ID", "Title", "Created", "#Msgs", "Size", "Tags"],
-        rows,
-        active_idx,
-    );
 
     println!("----------------------------");
     println!("Total Memory Used: {}", format_size(total_size_bytes));
 }
 
-fn truncate_around_active(rows: Vec<Vec<String>>, active_idx: Option<usize>) -> Vec<Vec<String>> {
-    if active_idx.is_none() {
-        return rows;
+/// Read every conversation named by the index, newest first.
+fn collect_infos(index: &Value, fur_dir: &Path) -> Vec<ConvoInfo> {
+    let empty_vec: Vec<Value> = Vec::new();
+    let threads = index["threads"].as_array().unwrap_or(&empty_vec);
+
+    let mut infos = Vec::new();
+
+    for tid in threads {
+        let Some(tid_str) = tid.as_str() else {
+            continue;
+        };
+
+        let convo_path = fur_dir.join("threads").join(format!("{}.json", tid_str));
+        let Ok(content) = fs::read_to_string(&convo_path) else {
+            continue;
+        };
+        let Ok(convo) = serde_json::from_str::<Value>(&content) else {
+            continue;
+        };
+
+        let msg_ids: Vec<String> = convo["messages"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let created = DateTime::parse_from_rfc3339(convo["created_at"].as_str().unwrap_or(""))
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or_else(|_| Utc::now());
+
+        let local: DateTime<Local> = DateTime::from(created);
+
+        infos.push(ConvoInfo {
+            id: tid_str.to_string(),
+            title: convo["title"].as_str().unwrap_or("Untitled").to_string(),
+            created,
+            date_str: local.format("%Y-%m-%d").to_string(),
+            time_str: local.format("%H:%M").to_string(),
+            msg_count: msg_ids.len(),
+            size_bytes: compute_conversation_size(fur_dir, tid_str, &msg_ids),
+            tags: convo["tags"]
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+        });
     }
-    let i = active_idx.unwrap();
-    let win = 3;
 
-    let start = i.saturating_sub(win);
-    let end = (i + win).min(rows.len() - 1);
-
-    let mut out = Vec::new();
-
-    if start > 0 {
-        out.push(vec!["...".into(); rows[0].len()]);
-    }
-
-    for idx in start..=end {
-        out.push(rows[idx].clone());
-    }
-
-    if end < rows.len() - 1 {
-        out.push(vec!["...".into(); rows[0].len()]);
-    }
-
-    out
+    infos.sort_by(|a, b| b.created.cmp(&a.created));
+    infos
 }
+
+fn row_for(info: &ConvoInfo, title: String) -> Vec<String> {
+    vec![
+        info.id[..8].to_string(),
+        title,
+        format!("{} | {}", info.date_str, info.time_str),
+        info.msg_count.to_string(),
+        format_size(info.size_bytes),
+        info.tags.clone(),
+    ]
+}
+
+const HEADERS: [&str; 6] = ["ID", "Title", "Created", "#Msgs", "Size", "Tags"];
+
+/// Newest-first list with no nesting — the pre-lineage view.
+fn render_flat(infos: &[ConvoInfo], active: &str) {
+    let rows: Vec<Vec<String>> = infos
+        .iter()
+        .map(|info| row_for(info, info.title.clone()))
+        .collect();
+
+    let active_idx = infos.iter().position(|i| i.id == active);
+
+    render_table("Conversations", &HEADERS, rows, active_idx);
+}
+
+/// Lineage view: parents at the margin, children indented beneath them.
+///
+/// Conversations with no edges sit flat at the margin exactly as they do in the
+/// flat view, so an archive that never uses linking looks unchanged.
+fn render_tree(infos: &[ConvoInfo], active: &str, fur_dir: &Path) {
+    let lineage = match Lineage::load(fur_dir) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("⚠ lineage unavailable ({}); showing a flat list", e);
+            return render_flat(infos, active);
+        }
+    };
+
+    if lineage.is_empty() {
+        return render_flat(infos, active);
+    }
+
+    let by_id: HashMap<&str, &ConvoInfo> = infos.iter().map(|i| (i.id.as_str(), i)).collect();
+    let order: Vec<String> = infos.iter().map(|i| i.id.clone()).collect();
+
+    let mut rows = Vec::new();
+    let mut active_idx = None;
+    let mut any_repeat = false;
+    let mut any_orphan = false;
+
+    for entry in lineage.forest(&order) {
+        let Some(info) = by_id.get(entry.id.as_str()) else {
+            continue;
+        };
+
+        let indent = if entry.depth == 0 {
+            String::new()
+        } else {
+            format!("{}└─ ", "   ".repeat(entry.depth - 1))
+        };
+
+        let mut title = format!("{}{}", indent, info.title);
+
+        if entry.orphan_parent {
+            any_orphan = true;
+            title.push_str(" ↑");
+        }
+
+        if entry.repeat {
+            any_repeat = true;
+            title.push_str(" (above)");
+        }
+
+        if entry.id == active && !entry.repeat {
+            active_idx = Some(rows.len());
+        }
+
+        rows.push(row_for(info, title));
+    }
+
+    render_table("Conversations", &HEADERS, rows, active_idx);
+
+    if any_orphan {
+        println!(
+            "{}",
+            "↑ linked to a conversation that is not in this project".bright_black()
+        );
+    }
+    if any_repeat {
+        println!(
+            "{}",
+            "(above) listed under another parent as well".bright_black()
+        );
+    }
+}
+
+// ======================================================
+//  SWITCH / TAG
+// ======================================================
 
 fn handle_switch_thread(index: &mut Value, index_path: &Path, fur_dir: &Path, args: &ThreadArgs) {
     let tid = match &args.id {
@@ -398,6 +470,7 @@ fn handle_tagging(args: &ThreadArgs, index: &mut Value, fur_dir: &Path) {
         convo["tags"] = json!([]);
         fs::write(&convo_path, serde_json::to_string_pretty(&convo).unwrap()).unwrap();
         println!("🏷️ Cleared tags for {}", &target_tid[..8]);
+        crate::schema::bridge::sync_active();
         return;
     }
 
@@ -425,6 +498,7 @@ fn handle_tagging(args: &ThreadArgs, index: &mut Value, fur_dir: &Path) {
             remove_list.join(", "),
             &target_tid[..8]
         );
+        crate::schema::bridge::sync_active();
         return;
     }
 
@@ -444,9 +518,13 @@ fn handle_tagging(args: &ThreadArgs, index: &mut Value, fur_dir: &Path) {
         fs::write(&convo_path, serde_json::to_string_pretty(&convo).unwrap()).unwrap();
 
         println!("🏷️ Updated tags for {}", &target_tid[..8]);
-        return;
+        crate::schema::bridge::sync_active();
     }
 }
+
+// ======================================================
+//  SIZE
+// ======================================================
 
 /// Computes total storage: conversation.json + all message JSONs + all markdown attachments.
 fn compute_conversation_size(fur_dir: &Path, tid: &str, msg_ids: &[String]) -> u64 {

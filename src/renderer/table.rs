@@ -7,16 +7,21 @@ pub fn render_table(
     active_idx: Option<usize>,
 ) {
     // Compute column widths
+    // Rust pads `{:width$}` by character count, so widths must be measured the
+    // same way. Byte length silently over-pads any cell containing box-drawing
+    // glyphs or accented text.
+    let width_of = |s: &str| s.chars().count();
+
     let col_widths: Vec<usize> = headers
         .iter()
         .enumerate()
         .map(|(i, h)| {
             let max_cell = rows
                 .iter()
-                .map(|r| r.get(i).map(|s| s.len()).unwrap_or(0))
+                .map(|r| r.get(i).map(|s| width_of(s)).unwrap_or(0))
                 .max()
                 .unwrap_or(0);
-            max_cell.max(h.len())
+            max_cell.max(width_of(h))
         })
         .collect();
 
@@ -35,7 +40,8 @@ pub fn render_table(
     println!("{}", header_line.bold());
     println!("{}", "=".repeat(total_width));
 
-    // Rows
+    // Rows. No blank line between them: in a nested listing the vertical gap
+    // competes with the indentation for the reader's sense of structure.
     for (i, row) in rows.iter().enumerate() {
         let mut line = String::new();
         for (j, cell) in row.iter().enumerate() {
@@ -47,7 +53,6 @@ pub fn render_table(
         } else {
             println!("{}", line);
         }
-        println!();
     }
 
     // Bottom border

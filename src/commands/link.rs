@@ -216,6 +216,26 @@ pub fn apply(
         ));
     }
 
+    // A loop can only be *created* locally, so it is refused here rather than in
+    // the format. An archive can still contain one after importing two halves
+    // published independently, which is why every walk keeps a visited set.
+    if !remove {
+        let (parent, child) = match edge {
+            Edge::Parent => (other.as_str(), target.as_str()),
+            Edge::Child => (target.as_str(), other.as_str()),
+        };
+
+        if let Ok(lineage) = crate::schema::lineage::Lineage::load(&fur_dir) {
+            if lineage.would_cycle(parent, child) {
+                return Err(format!(
+                    "that would loop: {} already leads back to {}",
+                    short(child),
+                    short(parent)
+                ));
+            }
+        }
+    }
+
     let near = edit_edge(&fur_dir, &target, edge.field(), &other, remove)?;
     let far = if other_is_local {
         Some(edit_edge(
