@@ -114,7 +114,7 @@ pub fn run_frs(path: &str) {
                 }
 
                 // Now run printed, which will read this modified active_thread
-                crate::commands::printed::run_printed(out.clone(), verbose);
+                crate::commands::printed::run_printed(out.clone(), verbose, None, None);
 
                 // Restore original active_thread
                 if let Some(orig) = original_active {

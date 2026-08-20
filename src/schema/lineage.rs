@@ -20,7 +20,7 @@
 //! needs for diamonds regardless — so a node reached twice is emitted once and
 //! flagged, never expanded again.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -151,6 +151,139 @@ impl Lineage {
         }
 
         false
+    }
+
+    /// Every local conversation reachable upward from `start`, in dependency
+    /// order: a conversation always appears after everything it draws on.
+    ///
+    /// `start` is last. Absent conversations are skipped — there is nothing
+    /// local to print for them — but `absent_ancestors` reports them so the
+    /// document can say what it could not include.
+    pub fn ancestry(&self, start: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut state: HashMap<String, u8> = HashMap::new();
+        self.visit_up(start, &mut state, &mut out);
+        out
+    }
+
+    /// Post-order DFS. `state` marks 1 = in progress, 2 = emitted; the
+    /// in-progress mark is what makes an imported cycle terminate instead of
+    /// recursing forever.
+    fn visit_up(&self, id: &str, state: &mut HashMap<String, u8>, out: &mut Vec<String>) {
+        match state.get(id) {
+            Some(_) => return,
+            None => state.insert(id.to_string(), 1),
+        };
+
+        if let Some(parents) = self.parents.get(id) {
+            for parent in parents {
+                if self.is_local(parent) {
+                    self.visit_up(parent, state, out);
+                }
+            }
+        }
+
+        state.insert(id.to_string(), 2);
+
+        if self.is_local(id) {
+            out.push(id.to_string());
+        }
+    }
+
+    /// Every local conversation reachable downward from `start`, in dependency
+    /// order: a conversation always appears after everything it draws on.
+    ///
+    /// The reachable set is collected first, then ordered by walking *upward*
+    /// within it — the same rule that orders ancestors. Ordering by descent
+    /// would emit a diamond's tip before one of its arms.
+    pub fn descendants(&self, start: &str) -> Vec<String> {
+        let mut reachable: HashSet<String> = HashSet::new();
+        let mut stack = vec![start.to_string()];
+
+        while let Some(id) = stack.pop() {
+            if !reachable.insert(id.clone()) {
+                continue;
+            }
+            if let Some(kids) = self.children.get(&id) {
+                stack.extend(kids.iter().cloned());
+            }
+        }
+
+        let mut out = Vec::new();
+        let mut state: HashMap<String, u8> = HashMap::new();
+
+        // Seed `start` as emitted so it leads, and so parents outside the
+        // reachable set are never pulled in by the upward walk.
+        state.insert(start.to_string(), 2);
+        if self.is_local(start) {
+            out.push(start.to_string());
+        }
+
+        let mut members: Vec<&String> = reachable.iter().filter(|id| *id != start).collect();
+        members.sort();
+
+        for id in members {
+            self.visit_up_within(id, &reachable, &mut state, &mut out);
+        }
+
+        out
+    }
+
+    /// Post-order DFS restricted to `allowed`, so ordering a subgraph cannot
+    /// drag in conversations from outside it.
+    fn visit_up_within(
+        &self,
+        id: &str,
+        allowed: &HashSet<String>,
+        state: &mut HashMap<String, u8>,
+        out: &mut Vec<String>,
+    ) {
+        match state.get(id) {
+            Some(_) => return,
+            None => state.insert(id.to_string(), 1),
+        };
+
+        if let Some(parents) = self.parents.get(id) {
+            for parent in parents {
+                if allowed.contains(parent) && self.is_local(parent) {
+                    self.visit_up_within(parent, allowed, state, out);
+                }
+            }
+        }
+
+        state.insert(id.to_string(), 2);
+
+        if self.is_local(id) {
+            out.push(id.to_string());
+        }
+    }
+
+    /// Ancestors of `start` that this project does not hold, so a provenance
+    /// document can name what it was unable to include.
+    pub fn absent_ancestors(&self, start: &str) -> Vec<String> {
+        let local = self.ancestry(start);
+        let mut out = BTreeSet::new();
+
+        for id in local.iter().map(|s| s.as_str()).chain(std::iter::once(start)) {
+            if let Some(parents) = self.parents.get(id) {
+                for parent in parents {
+                    if !self.is_local(parent) {
+                        out.insert(parent.clone());
+                    }
+                }
+            }
+        }
+
+        out.into_iter().collect()
+    }
+
+    /// Direct local parents of `id`, for the lineage map at the head of a
+    /// provenance document.
+    pub fn parents_of(&self, id: &str) -> Vec<String> {
+        self.parents
+            .get(id)
+            .map(|set| set.iter().filter(|p| self.is_local(p)).cloned().collect())
+            .unwrap_or_default()
     }
 
     /// Edges between two local conversations asserted from one side only.

@@ -125,8 +125,22 @@ enum Commands {
     #[command(about = "Everyday:: Export full conversation as Markdown")]
     Printed {
         out: Option<String>,
+
+        /// Include the text of long-form attachments
         #[arg(short, long)]
         verbose: bool,
+
+        /// Include everything this conversation draws on
+        #[arg(long)]
+        provenance: bool,
+
+        /// Provenance in both directions: sources and what came after
+        #[arg(long, conflicts_with = "provenance")]
+        full: bool,
+
+        /// Conversation to print (id or prefix); defaults to the active one
+        #[arg(long)]
+        id: Option<String>,
     },
 
     #[command(about = "Everyday:: Search all conversations for text or markdown matches")]
@@ -370,7 +384,22 @@ fn main() {
             timeline::run_timeline(a);
         }
 
-        Commands::Printed { out, verbose } => printed::run_printed(out, verbose),
+        Commands::Printed {
+            out,
+            verbose,
+            provenance,
+            full,
+            id,
+        } => {
+            let scope = if full {
+                Some(commands::provenance::Scope::Full)
+            } else if provenance {
+                Some(commands::provenance::Scope::Ancestors)
+            } else {
+                None
+            };
+            printed::run_printed(out, verbose, scope, id)
+        }
 
         Commands::Doctor(args) => doctor::run_doctor(args),
 

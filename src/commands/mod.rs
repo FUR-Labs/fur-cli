@@ -11,6 +11,7 @@ pub mod message;
 pub mod new;
 pub mod onboard;
 pub mod printed;
+pub mod provenance;
 pub mod publish;
 pub mod registry;
 pub mod rebuild;
