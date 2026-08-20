@@ -189,11 +189,29 @@ fn collect_paths(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), Strin
 
 fn source_metadata(folder: &Path, doc: &FurDocument) -> Result<Value, String> {
     let origin_path = folder.join(ORIGIN_FILENAME);
+
+    // Lineage is carried in `source`, not in the snapshot, because `source` is
+    // the queryable metadata channel: a registry can index and graph these
+    // edges without parsing every spine it holds.
+    //
+    // The edges are *also* inside `convo.md`, which is part of the digest, so
+    // linking a published conversation legitimately produces a new revision.
+    // That is the intended reading — the document is the record, and the record
+    // changed.
+    //
+    // Edges name conversation ids, not publication ids. A referenced
+    // conversation that was never published leaves an edge pointing at nothing,
+    // which is partial knowledge rather than corruption, exactly as it is
+    // locally.
     let mut source = json!({
         "format": "fur.conversation-directory",
         "fur_document_schema": doc.schema,
         "conversation_id": doc.conversation_id,
         "origin_kind": "local",
+        "lineage": {
+            "parents": doc.parents,
+            "children": doc.children
+        },
         "producer": {"fur_version": env!("CARGO_PKG_VERSION")}
     });
 

@@ -15,7 +15,7 @@ fn package() -> serde_json::Value {
     let attachment = b"# Analysis\n\nBody.\n";
     let attachment_hash = hash(attachment);
     let spine = format!(
-        "---\nfur_schema: 1\nconversation_id: 11111111-1111-4111-8111-111111111111\ntitle: Imported Research\ncreated_at: 2026-08-09T20:00:00Z\ntags: []\n---\n\n<!-- fur:msg id=22222222-2222-4222-8222-222222222222 avatar=andrew ts=2026-08-09T20:01:00Z -->\n\nLocal question.\n\n<!-- fur:msg id=33333333-3333-4333-8333-333333333333 avatar=gpt5 ts=2026-08-09T20:02:00Z link=analysis.md sha256={} -->\n",
+        "---\nfur_schema: 2\nconversation_id: 11111111-1111-4111-8111-111111111111\ntitle: Imported Research\ncreated_at: 2026-08-09T20:00:00Z\ntags: []\nparents:\n  - 99999999-9999-4999-8999-999999999999\nchildren: []\n---\n\n<!-- fur:msg id=22222222-2222-4222-8222-222222222222 avatar=andrew ts=2026-08-09T20:01:00Z -->\n\nLocal question.\n\n<!-- fur:msg id=33333333-3333-4333-8333-333333333333 avatar=gpt5 ts=2026-08-09T20:02:00Z link=analysis.md sha256={} -->\n",
         attachment_hash
     );
     let spine_hash = hash(spine.as_bytes());
@@ -187,4 +187,33 @@ fn tampered_diary_is_rejected_before_any_project_is_installed() {
     assert!(error.contains("incorrect size"));
     assert!(!tmp.path().join("chats").exists());
     assert!(!tmp.path().join(".fur").exists());
+}
+
+#[test]
+fn imported_lineage_reaches_the_local_index() {
+    // The referenced parent was never published, so the imported conversation
+    // lands holding an edge to something absent — the registry equivalent of a
+    // dangling local reference, and equally legal.
+    let tmp = tempdir().unwrap();
+
+    fur_cli::commands::registry::install_pull_value(tmp.path(), package()).unwrap();
+
+    let thread: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            tmp.path()
+                .join(".fur/threads/11111111-1111-4111-8111-111111111111.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        thread["parents"][0],
+        "99999999-9999-4999-8999-999999999999"
+    );
+    assert_eq!(thread["children"].as_array().unwrap().len(), 0);
+
+    let lineage =
+        fur_cli::schema::lineage::Lineage::load(&tmp.path().join(".fur")).unwrap();
+    assert_eq!(lineage.dangling().len(), 1);
 }
