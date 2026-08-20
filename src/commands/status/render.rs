@@ -1,4 +1,4 @@
-use crate::frs::avatars::resolve_avatar;
+use crate::avatars::resolve_avatar;
 use colored::*;
 use serde_json::Value;
 use std::collections::HashMap;

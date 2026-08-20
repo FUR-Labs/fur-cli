@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -8,6 +8,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
+
+// Public so `tests/doctor.rs` can name the type without a second import path.
+pub use crate::schema::lineage::Lineage;
 
 #[derive(Parser, Debug)]
 pub struct DoctorArgs {
@@ -61,7 +64,8 @@ pub fn run_doctor(args: DoctorArgs) {
     }
 
     if missing.is_empty() {
-        println!("✔ No issues detected.");
+        println!("✔ Attachments: no issues detected.\n");
+        report_lineage(fur_dir);
         return;
     }
 
@@ -276,7 +280,176 @@ pub fn run_doctor(args: DoctorArgs) {
     println!("Recovered references: {}", recovered_refs);
     println!("Unrecoverable attachments: {}", unrecoverable.len());
 
+    println!();
+    report_lineage(fur_dir);
+
     println!("\nDoctor finished.");
+}
+
+/// Report on conversation lineage. Nothing here is repaired automatically.
+///
+/// Every condition below is legal — a half-written edge may simply be waiting
+/// for the other conversation to be imported, and a loop can arrive from
+/// merging two independently published halves. Repairing them silently would
+/// destroy information the user is better placed to judge.
+fn report_lineage(fur_dir: &Path) {
+    let lineage = match Lineage::load(fur_dir) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("⚠ Could not read lineage: {}", e);
+            return;
+        }
+    };
+
+    if lineage.is_empty() {
+        println!("Lineage\n-------");
+        println!("{}", "  No conversations are linked.".bright_black());
+        return;
+    }
+
+    println!("{}", "Lineage".bold());
+    println!("-------");
+
+    let dangling = lineage.dangling();
+    let asymmetric = lineage.asymmetric();
+    let loops = find_loops(&lineage);
+
+    if dangling.is_empty() && asymmetric.is_empty() && loops.is_empty() {
+        println!("{}", "  ✔ All links resolve, and both sides agree.".green());
+        return;
+    }
+
+    if !dangling.is_empty() {
+        println!("\n{}", "  Links to conversations not in this project".bold());
+        for id in &dangling {
+            println!("    • {}", id.bright_black());
+        }
+        println!(
+            "{}",
+            "    Expected after importing part of a diary. Import the rest, or unlink."
+                .bright_black()
+        );
+    }
+
+    if !asymmetric.is_empty() {
+        println!("\n{}", "  Links recorded on one side only".bold());
+        for (parent, child) in &asymmetric {
+            println!(
+                "    • {} → {}   {}",
+                label(&lineage, parent),
+                label(&lineage, child),
+                "(the other side does not say so)".bright_black()
+            );
+        }
+        println!(
+            "{}",
+            "    Fix by re-linking, which writes both ends:".bright_black()
+        );
+        for (parent, child) in &asymmetric {
+            println!(
+                "      fur link {} --child {}",
+                short(parent),
+                short(child)
+            );
+        }
+    }
+
+    if !loops.is_empty() {
+        println!("\n{}", "  Loops".bold());
+        for cycle in &loops {
+            let path: Vec<String> = cycle.iter().map(|id| label(&lineage, id)).collect();
+            println!("    • {} → {}", path.join(" → "), path[0]);
+        }
+        println!(
+            "{}",
+            "    `fur link` refuses to create these, so this archive most likely"
+                .bright_black()
+        );
+        println!(
+            "{}",
+            "    merged two halves published separately. Unlink one edge to break it."
+                .bright_black()
+        );
+    }
+}
+
+/// Every cycle reachable in the lineage graph, each reported once.
+///
+/// Depth-first with an explicit path: an edge back into the current path closes
+/// a loop, and the slice from that point is the cycle itself. Cycles are
+/// normalised to start at their smallest id so the same loop found from two
+/// entry points is reported once.
+fn find_loops(lineage: &Lineage) -> Vec<Vec<String>> {
+    let mut found: HashSet<Vec<String>> = HashSet::new();
+    let mut done: HashSet<String> = HashSet::new();
+
+    for id in lineage.ids() {
+        if done.contains(&id) {
+            continue;
+        }
+        let mut path: Vec<String> = Vec::new();
+        walk_for_loops(lineage, &id, &mut path, &mut done, &mut found);
+    }
+
+    let mut out: Vec<Vec<String>> = found.into_iter().collect();
+    out.sort();
+    out
+}
+
+fn walk_for_loops(
+    lineage: &Lineage,
+    id: &str,
+    path: &mut Vec<String>,
+    done: &mut HashSet<String>,
+    found: &mut HashSet<Vec<String>>,
+) {
+    if let Some(at) = path.iter().position(|p| p == id) {
+        found.insert(normalise_cycle(&path[at..]));
+        return;
+    }
+    if done.contains(id) {
+        return;
+    }
+
+    path.push(id.to_string());
+
+    for child in lineage.all_children(id) {
+        if lineage.is_local(&child) {
+            walk_for_loops(lineage, &child, path, done, found);
+        }
+    }
+
+    path.pop();
+    done.insert(id.to_string());
+}
+
+/// Rotate a cycle to begin at its smallest id, so one loop has one spelling.
+fn normalise_cycle(cycle: &[String]) -> Vec<String> {
+    let Some(start) = cycle
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, id)| *id)
+        .map(|(i, _)| i)
+    else {
+        return Vec::new();
+    };
+
+    cycle[start..].iter().chain(&cycle[..start]).cloned().collect()
+}
+
+fn label(lineage: &Lineage, id: &str) -> String {
+    match lineage.title(id) {
+        Some(title) => format!("{} \"{}\"", short(id), title),
+        None => short(id).to_string(),
+    }
+}
+
+fn short(id: &str) -> &str {
+    if id.len() >= 8 {
+        &id[..8]
+    } else {
+        id
+    }
 }
 
 fn collect_roots(deep: bool) -> Vec<PathBuf> {
@@ -319,4 +492,14 @@ fn extract_size(msg_path: &Path) -> Option<u64> {
 
 fn extract_filename(path: &str) -> Option<&str> {
     Path::new(path).file_name()?.to_str()
+}
+
+// --- test seam -------------------------------------------------------------
+//
+// Loop detection is the one piece of `doctor` with logic worth testing apart
+// from its printing.
+
+#[allow(dead_code)]
+pub fn find_loops_for_test(lineage: &Lineage) -> Vec<Vec<String>> {
+    find_loops(lineage)
 }

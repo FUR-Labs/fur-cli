@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use uuid::Uuid;
 
-use crate::frs::avatars::{get_random_emoji_for_name, load_avatars, save_avatars};
+use crate::avatars::{get_random_emoji_for_name, load_avatars, save_avatars};
 use crate::schema::{make_conversation_metadata, make_index_metadata};
 
 fn init_fur_dir(fur_dir: &Path) -> io::Result<()> {

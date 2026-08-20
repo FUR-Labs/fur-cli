@@ -16,8 +16,6 @@ pub mod provenance;
 pub mod publish;
 pub mod registry;
 pub mod rebuild;
-pub mod run;
-pub mod save;
 pub mod search;
 pub mod status;
 pub mod sweep;

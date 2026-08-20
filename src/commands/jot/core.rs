@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::commands::jot::JotArgs;
-use crate::frs::avatars::{load_avatars, resolve_avatar};
+use crate::avatars::{load_avatars, resolve_avatar};
 use crate::schema::{make_message_metadata, SCHEMA_VERSION};
 
 pub struct FurContext {

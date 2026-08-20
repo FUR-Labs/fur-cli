@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
-use crate::frs::avatars::resolve_avatar;
+use crate::avatars::resolve_avatar;
 
 #[allow(dead_code)]
 pub struct MessageInfo {

@@ -1,6 +1,5 @@
 pub mod avatars;
 mod commands;
-mod frs;
 mod git;
 mod helpers;
 mod renderer;
@@ -32,8 +31,6 @@ use crate::commands::{
     onboard::{self, OnboardArgs},
     printed,
     rebuild::{self, RebuildArgs},
-    run,
-    save::{self, SaveArgs},
     search::{self, SearchArgs},
     status,
     sweep::{self, SweepArgs},
@@ -260,15 +257,6 @@ enum Commands {
     )]
     Gsearch(SweepArgs),
 
-    // Scripting
-    #[command(about = "Scripting:: Run a .frs (FurScript) script with `fur <script.frs>`)")]
-    Run {
-        path: String,
-    },
-
-    #[command(about = "Scripting:: Save your conversation as a .frs script")]
-    Save(SaveArgs),
-
     // Experimental
     #[command(about = "Under development:: Jump to specific chat within convo")]
     Jump(JumpArgs),
@@ -306,14 +294,6 @@ fn dispatch_git(cmd: GitCmd) {
 }
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-
-    // .frs shortcut
-    if args.len() == 2 && args[1].ends_with(".frs") {
-        run::run_frs(&args[1]);
-        return;
-    }
-
     let cli = Cli::parse();
 
     // Locked archives, and copied archives with no .fur/ index.
@@ -470,10 +450,6 @@ fn main() {
         }
 
         Commands::Gsearch(a) => sweep::run_sweep(a),
-
-        Commands::Run { path } => run::run_frs(&path),
-
-        Commands::Save(a) => save::run_save(a),
 
         Commands::Clone { id, title } => {
             if id.is_empty() {
