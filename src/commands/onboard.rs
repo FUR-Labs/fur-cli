@@ -136,6 +136,7 @@ fn show_avatar_table(avatars: &Value, counts: &BTreeMap<String, usize>) {
         &["#", "Name", "Emoji", "Messages"],
         rows,
         active_idx,
+        true,
     );
 }
 
@@ -198,7 +199,7 @@ fn apply_emoji(avatars: &mut Value, counts: &BTreeMap<String, usize>) {
         .map(|(name, emoji)| vec![name.clone(), emoji.clone()])
         .collect();
 
-    render_table("Suggested", &["Name", "Emoji"], rows, None);
+    render_table("Suggested", &["Name", "Emoji"], rows, None, true);
 
     if ask_yes_no("Keep these? [Y/n]: ", default_yes) {
         for (name, emoji) in suggestions {

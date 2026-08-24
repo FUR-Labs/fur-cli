@@ -65,7 +65,7 @@ pub fn run_avatar_view() {
             }
         }
 
-        render_table("Avatars", &["Role", "Emoji", "Messages"], rows, active_idx);
+        render_table("Avatars", &["Role", "Emoji", "Messages"], rows, active_idx, true);
     }
 }
 

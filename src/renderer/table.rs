@@ -1,10 +1,14 @@
 use colored::*;
 
+/// `spaced` puts a blank line between rows. Right for a flat list, wrong for a
+/// nested one: in a tree the vertical gap competes with the indentation for the
+/// reader's sense of structure.
 pub fn render_table(
     title: &str,
     headers: &[&str],
     rows: Vec<Vec<String>>,
     active_idx: Option<usize>,
+    spaced: bool,
 ) {
     // Compute column widths
     // Rust pads `{:width$}` by character count, so widths must be measured the
@@ -40,8 +44,6 @@ pub fn render_table(
     println!("{}", header_line.bold());
     println!("{}", "=".repeat(total_width));
 
-    // Rows. No blank line between them: in a nested listing the vertical gap
-    // competes with the indentation for the reader's sense of structure.
     for (i, row) in rows.iter().enumerate() {
         let mut line = String::new();
         for (j, cell) in row.iter().enumerate() {
@@ -52,6 +54,10 @@ pub fn render_table(
             println!("{}", line.bold().bright_yellow());
         } else {
             println!("{}", line);
+        }
+
+        if spaced {
+            println!();
         }
     }
 

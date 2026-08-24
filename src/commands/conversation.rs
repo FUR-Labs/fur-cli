@@ -301,7 +301,7 @@ fn render_flat(infos: &[ConvoInfo], active: &str) {
 
     let active_idx = infos.iter().position(|i| i.id == active);
 
-    render_table("Conversations", &HEADERS, rows, active_idx);
+    render_table("Conversations", &HEADERS, rows, active_idx, true);
 }
 
 /// Lineage view: parents at the margin, children indented beneath them.
@@ -359,7 +359,7 @@ fn render_tree(infos: &[ConvoInfo], active: &str, fur_dir: &Path) {
         rows.push(row_for(info, title));
     }
 
-    render_table("Conversations", &HEADERS, rows, active_idx);
+    render_table("Conversations", &HEADERS, rows, active_idx, false);
 
     if any_orphan {
         println!(
