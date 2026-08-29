@@ -203,7 +203,18 @@ fn source_metadata(folder: &Path, doc: &FurDocument) -> Result<Value, String> {
     // conversation that was never published leaves an edge pointing at nothing,
     // which is partial knowledge rather than corruption, exactly as it is
     // locally.
-    let mut source = json!({
+    
+    // Authorship travels beside lineage, for the same reason: a registry can
+    // index and display who spoke without parsing every spine it holds.
+    //
+    // Derived from the `avatar=` markers actually present in the document —
+    // ground truth for who spoke — not from whoever ran `fur publish`. Humans
+    // and AI share one list, discriminated by `kind`, because the document
+    // format makes no distinction and consumers should choose presentation.
+    // `role` appears only when configured.
+    //
+    // `source` is not hashed, so enriching authorship never forces a revision.
+    let source = json!({
         "format": "fur.conversation-directory",
         "fur_document_schema": doc.schema,
         "conversation_id": doc.conversation_id,
@@ -212,8 +223,10 @@ fn source_metadata(folder: &Path, doc: &FurDocument) -> Result<Value, String> {
             "parents": doc.parents,
             "children": doc.children
         },
+        "authors": document_authors(folder, doc),
         "producer": {"fur_version": env!("CARGO_PKG_VERSION")}
     });
+    let mut source = source;
 
     if origin_path.exists() {
         let text = fs::read_to_string(&origin_path)
@@ -233,6 +246,43 @@ fn source_metadata(folder: &Path, doc: &FurDocument) -> Result<Value, String> {
         });
     }
     Ok(source)
+}
+
+/// The distinct avatars that speak in this document, sorted for determinism.
+///
+/// Reads `.fur/avatars.json` when present, purely to enrich; an archive with no
+/// `.fur/` still publishes correct authorship from the markers alone.
+fn document_authors(folder: &Path, doc: &FurDocument) -> Vec<Value> {
+    let avatars = folder
+        .parent()
+        .and_then(|chats| chats.parent())
+        .map(|root| root.join(".fur").join("avatars.json"))
+        .and_then(|path| fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .unwrap_or_else(|| json!({}));
+
+    let mut names: Vec<&str> = doc
+        .messages
+        .iter()
+        .map(|message| message.avatar.as_str())
+        .filter(|name| !name.trim().is_empty())
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+
+    names
+        .into_iter()
+        .map(|name| {
+            let mut entry = json!({
+                "name": name,
+                "kind": crate::avatars::kind_of(&avatars, name)
+            });
+            if let Some(role) = crate::avatars::role_of(&avatars, name) {
+                entry["role"] = json!(role);
+            }
+            entry
+        })
+        .collect()
 }
 
 fn relative_path(root: &Path, path: &Path) -> Result<String, String> {

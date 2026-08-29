@@ -4,7 +4,9 @@ use std::fs;
 use std::path::Path;
 
 use crate::avatars::emojis::pick_emoji;
-use crate::avatars::{get_random_emoji_for_name, load_avatars, save_avatars, MAIN_EMOJI};
+use crate::avatars::{
+    get_random_emoji_for_name, kind_of, load_avatars, role_of, save_avatars, set_meta, MAIN_EMOJI,
+};
 use crate::commands::utils::input::{ask_string, ask_yes_no, default_yes};
 use crate::renderer::table::render_table;
 use colored::*;
@@ -36,35 +38,74 @@ pub fn count_messages_per_avatar() -> HashMap<String, usize> {
 pub fn run_avatar_view() {
     let avatars = load_avatars();
 
-    if let Some(map) = avatars.as_object() {
-        if map.is_empty() {
-            println!("(no avatars yet)");
-            return;
-        }
+    let Some(map) = avatars.as_object() else {
+        return;
+    };
+    if map.is_empty() {
+        println!("(no avatars yet)");
+        return;
+    }
 
-        let mut rows = Vec::new();
-        let mut active_idx = None;
+    let msg_counts = count_messages_per_avatar();
 
-        let msg_counts = count_messages_per_avatar();
+    // The Role column appears only when something occupies it, so a project
+    // that never sets roles sees the table it has always seen.
+    let any_role = map
+        .keys()
+        .any(|name| !crate::avatars::is_reserved_key(name) && role_of(&avatars, name).is_some());
 
-        for (i, (name, val)) in map.iter().enumerate() {
-            if name == "main" {
-                if let Some(target) = val.as_str() {
-                    let count = msg_counts.get(target).copied().unwrap_or(0);
-                    rows.push(vec![
-                        "⭐ main".to_string(),
-                        target.to_string(),
-                        count.to_string(),
-                    ]);
-                    active_idx = Some(i);
-                }
-            } else {
-                let emoji = val.as_str().unwrap_or("🐾");
-                let count = msg_counts.get(name).copied().unwrap_or(0);
-                rows.push(vec![name.to_string(), emoji.to_string(), count.to_string()]);
+    let mut rows = Vec::new();
+    let mut active_idx = None;
+
+    for (name, value) in map.iter() {
+        // `main` is a pointer, not an avatar: it renders as its own starred row
+        // naming the avatar it points at.
+        if name == "main" {
+            let Some(target) = value.as_str() else {
+                continue;
+            };
+            let count = msg_counts.get(target).copied().unwrap_or(0);
+            let mut row = vec![
+                "⭐ main".to_string(),
+                target.to_string(),
+                count.to_string(),
+            ];
+            if any_role {
+                row.push(role_of(&avatars, target).unwrap_or_default());
             }
+            active_idx = Some(rows.len());
+            rows.push(row);
+            continue;
         }
 
+        if crate::avatars::is_reserved_key(name) {
+            continue;
+        }
+
+        let emoji = value.as_str().unwrap_or("🐾").to_string();
+        let count = msg_counts.get(name).copied().unwrap_or(0);
+        let label = if kind_of(&avatars, name) == "ai" {
+            format!("{} · IA", name)
+        } else {
+            name.to_string()
+        };
+
+        let mut row = vec![label, emoji, count.to_string()];
+        if any_role {
+            row.push(role_of(&avatars, name).unwrap_or_default());
+        }
+        rows.push(row);
+    }
+
+    if any_role {
+        render_table(
+            "Avatars",
+            &["Role", "Emoji", "Messages", "Function"],
+            rows,
+            active_idx,
+            true,
+        );
+    } else {
         render_table("Avatars", &["Role", "Emoji", "Messages"], rows, active_idx, true);
     }
 }
@@ -124,5 +165,36 @@ fn create_secondary_avatar(avatars: &mut serde_json::Value) {
     println!(
         "[OK] Other avatar '{}' created with emoji '{}'",
         name, emoji
+    );
+}
+
+/// `fur avatar <name> --role "…" --kind ai|human --clear-role`
+pub fn run_avatar_meta(name: &str, role: Option<&str>, kind: Option<&str>, clear_role: bool) {
+    let mut avatars = load_avatars();
+
+    if avatars.get(name).is_none() {
+        let emoji = get_random_emoji_for_name(name);
+        avatars[name] = json!(emoji);
+        println!("[OK] Avatar '{}' created {}", name, emoji);
+    }
+
+    if clear_role {
+        set_meta(&mut avatars, name, "role", None);
+    } else if let Some(value) = role {
+        set_meta(&mut avatars, name, "role", Some(value));
+    }
+
+    if let Some(value) = kind {
+        set_meta(&mut avatars, name, "kind", Some(value));
+    }
+
+    save_avatars(&avatars);
+
+    let shown_role = role_of(&avatars, name).unwrap_or_else(|| "—".to_string());
+    println!(
+        "🏷️  {} · {} · {}",
+        name.bright_yellow(),
+        kind_of(&avatars, name),
+        shown_role
     );
 }

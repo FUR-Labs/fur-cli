@@ -116,6 +116,103 @@ fn role_emoji(name: &str) -> Option<&'static str> {
         .map(|(_, emoji)| *emoji)
 }
 
+/// Optional per-avatar metadata, stored under the reserved `meta` key.
+///
+/// ```json
+/// { "main": "andrew", "andrew": "🦊", "claude": "✨",
+///   "meta": { "andrew": {"role": "Investigador Principal"},
+///             "claude": {"kind": "ai"} } }
+/// ```
+///
+/// viceroy: deliberately additive rather than a schema bump. `load_avatars`,
+/// `resolve_avatar` and all six call sites keep working untouched, and a
+/// project that never sets a role writes the same bytes it always did.
+/// `role` is absent when unset — never null, never "", never "?".
+pub const META_KEY: &str = "meta";
+
+/// Role for an avatar, when one has been set.
+pub fn role_of(avatars: &Value, name: &str) -> Option<String> {
+    avatars
+        .get(META_KEY)?
+        .get(name)?
+        .get("role")?
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.to_string())
+}
+
+/// "human" or "ai". Explicit metadata wins; otherwise inferred from the name,
+/// which is what `is_bot_name` already exists to answer.
+pub fn kind_of(avatars: &Value, name: &str) -> String {
+    let explicit = avatars
+        .get(META_KEY)
+        .and_then(|m| m.get(name))
+        .and_then(|entry| entry.get("kind"))
+        .and_then(|v| v.as_str());
+
+    match explicit {
+        Some("ai") => "ai".to_string(),
+        Some("human") => "human".to_string(),
+        _ if is_bot_name(name) => "ai".to_string(),
+        _ => "human".to_string(),
+    }
+}
+
+/// Set or clear one metadata field. Clearing removes the key entirely, and an
+/// avatar left with no metadata is removed from `meta` so the file does not
+/// accumulate empty objects.
+pub fn set_meta(avatars: &mut Value, name: &str, field: &str, value: Option<&str>) {
+    if !avatars.is_object() {
+        *avatars = json!({});
+    }
+    if avatars.get(META_KEY).map(|m| !m.is_object()).unwrap_or(true) {
+        avatars[META_KEY] = json!({});
+    }
+
+    match value {
+        Some(v) if !v.trim().is_empty() => {
+            if avatars[META_KEY].get(name).is_none() {
+                avatars[META_KEY][name] = json!({});
+            }
+            avatars[META_KEY][name][field] = json!(v.trim());
+        }
+        _ => {
+            if let Some(entry) = avatars[META_KEY].get_mut(name) {
+                if let Some(map) = entry.as_object_mut() {
+                    map.remove(field);
+                }
+            }
+        }
+    }
+
+    let empty = avatars[META_KEY]
+        .get(name)
+        .and_then(|e| e.as_object())
+        .map(|m| m.is_empty())
+        .unwrap_or(false);
+
+    if empty {
+        if let Some(meta) = avatars[META_KEY].as_object_mut() {
+            meta.remove(name);
+        }
+    }
+
+    if avatars[META_KEY]
+        .as_object()
+        .map(|m| m.is_empty())
+        .unwrap_or(false)
+    {
+        if let Some(map) = avatars.as_object_mut() {
+            map.remove(META_KEY);
+        }
+    }
+}
+
+/// True for keys that are not avatar names.
+pub fn is_reserved_key(key: &str) -> bool {
+    key == "main" || key == META_KEY
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

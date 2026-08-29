@@ -149,11 +149,12 @@ fn normalize(path: &Path) -> String {
 pub fn resolve_avatar_and_text(avatars: &Value, args: &JotArgs) -> (String, Option<String>) {
     let map = avatars.as_object().expect("avatars.json must be valid");
 
-    let main = map
-        .get("main")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_string();
+    // Identity chain first, `main` as the final fallback — so a machine that
+    // never runs `fur id` behaves exactly as it did before.
+    let main = crate::commands::id::current_identity()
+        .map(|(name, _)| name)
+        .or_else(|| map.get("main").and_then(|v| v.as_str()).map(String::from))
+        .unwrap_or_else(|| "unknown".to_string());
 
     match (&args.avatar, &args.positional_text) {
         (Some(a), Some(t)) => (a.clone(), Some(t.clone())),

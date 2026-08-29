@@ -23,6 +23,7 @@ use crate::commands::{
     doctor::{self, DoctorArgs},
     export::{self, ExportArgs},
     graph::{self, GraphArgs},
+    id::{self, IdArgs},
     jot::{self, JotArgs},
     jump::{self, JumpArgs},
     link::{self, LinkArgs},
@@ -197,7 +198,21 @@ enum Commands {
         action: Option<AvatarAction>,
         #[arg(long)]
         view: bool,
+        /// Avatar to describe (used with --role / --kind / --clear-role)
+        name: Option<String>,
+        /// Functional role, e.g. "Analista Económico"
+        #[arg(long)]
+        role: Option<String>,
+        /// human or ai
+        #[arg(long, value_parser = ["human", "ai"])]
+        kind: Option<String>,
+        /// Remove the role
+        #[arg(long)]
+        clear_role: bool,
     },
+
+    #[command(about = "Setup:: Show or set who this machine writes as")]
+    Id(IdArgs),
 
     #[command(about = "Management:: Clone a conversation safely (deep copy)")]
     Clone {
@@ -407,10 +422,26 @@ fn main() {
 
         Commands::Onboard(args) => onboard::run_onboard(args),
 
-        Commands::Avatar { action, .. } => match action {
+        Commands::Avatar {
+            action,
+            name,
+            role,
+            kind,
+            clear_role,
+            ..
+        } => match action {
             Some(AvatarAction::New) => avatar::run_avatar_onboarding(),
-            None => avatar::run_avatar_view(),
+            None => match name {
+                // `fur avatar <name> --role …` describes an avatar; bare
+                // `fur avatar` keeps listing them.
+                Some(target) if role.is_some() || kind.is_some() || clear_role => {
+                    avatar::run_avatar_meta(&target, role.as_deref(), kind.as_deref(), clear_role)
+                }
+                _ => avatar::run_avatar_view(),
+            },
         },
+
+        Commands::Id(a) => id::run_id(a),
 
         Commands::Convo(a) => conversation::run_conversation(a),
         Commands::Xclone { to, id, title } => {
