@@ -69,6 +69,7 @@ pub fn run_avatar_view() {
                 "⭐ main".to_string(),
                 target.to_string(),
                 count.to_string(),
+                kind_of(&avatars, target),
             ];
             if any_role {
                 row.push(role_of(&avatars, target).unwrap_or_default());
@@ -84,13 +85,16 @@ pub fn run_avatar_view() {
 
         let emoji = value.as_str().unwrap_or("🐾").to_string();
         let count = msg_counts.get(name).copied().unwrap_or(0);
-        let label = if kind_of(&avatars, name) == "ai" {
-            format!("{} · IA", name)
-        } else {
-            name.to_string()
-        };
 
-        let mut row = vec![label, emoji, count.to_string()];
+        // Kind is its own column, not a suffix on the name: the name is the
+        // identifier that appears in every message marker, and decorating it
+        // makes the table disagree with the documents.
+        let mut row = vec![
+            name.to_string(),
+            emoji,
+            count.to_string(),
+            kind_of(&avatars, name),
+        ];
         if any_role {
             row.push(role_of(&avatars, name).unwrap_or_default());
         }
@@ -100,13 +104,19 @@ pub fn run_avatar_view() {
     if any_role {
         render_table(
             "Avatars",
-            &["Role", "Emoji", "Messages", "Function"],
+            &["Role", "Emoji", "Messages", "Kind", "Function"],
             rows,
             active_idx,
             true,
         );
     } else {
-        render_table("Avatars", &["Role", "Emoji", "Messages"], rows, active_idx, true);
+        render_table(
+            "Avatars",
+            &["Role", "Emoji", "Messages", "Kind"],
+            rows,
+            active_idx,
+            true,
+        );
     }
 }
 

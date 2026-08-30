@@ -54,25 +54,46 @@ pub fn resolve_avatar(avatars: &Value, key: &str) -> (String, String) {
     (key.to_string(), PLACEHOLDER.to_string()) // fallback
 }
 
-/// Names that clearly belong to a model or agent.
+/// Model families distinctive enough to match anywhere in a name, so `gpt5`,
+/// `claude-opus` and `mi-gemini` all resolve.
 ///
-/// viceroy: the short markers used to be plain substring tests, so `ai` matched
-/// `claire`, `raina`, and `mail`, and `bot` matched `robotics`. Short markers
-/// are matched as whole tokens now; only the distinctive long ones stay
-/// substring matches, so `gpt5` and `claude-3` still resolve.
+/// This is a first guess, not a registry. `fur avatar <name> --kind ai` is the
+/// authoritative answer and is recorded in the archive; the list only spares
+/// people the flag in the common case. It therefore does not need to be
+/// exhaustive, and is deliberately not user-configurable — a second, editable
+/// source of truth would silently reclassify existing avatars when edited.
+pub const AI_NAME_FRAGMENTS: &[&str] = &[
+    "gpt",
+    "claude",
+    "gemini",
+    "bard",
+    "grok",
+    "copilot",
+    "llama",
+    "mistral",
+    "deepseek",
+    "qwen",
+];
+
+/// Generic words that mean "not a person", matched as whole tokens.
+///
+/// these are substring-unsafe — `ai` appears in `claire` and `raina`,
+/// `bot` in `robotics` — so they are split on non-alphanumerics and compared
+/// whole. Anything added here must survive that test.
+pub const AI_NAME_TOKENS: &[&str] = &[
+    "ai", "ia", "bot", "llm", "agent", "assistant", "asistente", "model", "modelo",
+];
+
+/// Names that clearly belong to a model or agent.
 pub fn is_bot_name(name: &str) -> bool {
     let n = name.to_lowercase();
 
-    const SUBSTRING_MARKERS: [&str; 6] = ["gpt", "claude", "gemini", "bard", "grok", "copilot"];
-
-    if SUBSTRING_MARKERS.iter().any(|m| n.contains(m)) {
+    if AI_NAME_FRAGMENTS.iter().any(|m| n.contains(m)) {
         return true;
     }
 
-    const TOKEN_MARKERS: [&str; 7] = ["ai", "bot", "llm", "agent", "assistant", "model", "llama"];
-
     n.split(|c: char| !c.is_alphanumeric())
-        .any(|tok| TOKEN_MARKERS.contains(&tok))
+        .any(|tok| AI_NAME_TOKENS.contains(&tok))
 }
 
 /// A sensible starting emoji for a name, so suggestions look considered rather
@@ -223,6 +244,16 @@ mod tests {
         assert!(is_bot_name("claude"));
         assert!(is_bot_name("my-ai"));
         assert!(is_bot_name("research agent"));
+    }
+
+    #[test]
+    fn recognises_spanish_and_current_models() {
+        assert!(is_bot_name("asistente"));
+        assert!(is_bot_name("mi-ia"));
+        assert!(is_bot_name("llama3"));
+        assert!(is_bot_name("deepseek-r1"));
+        assert!(!is_bot_name("maria"));
+        assert!(!is_bot_name("diana"));
     }
 
     #[test]
