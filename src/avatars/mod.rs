@@ -229,6 +229,20 @@ pub fn set_meta(avatars: &mut Value, name: &str, field: &str, value: Option<&str
     }
 }
 
+/// Human-readable name for an avatar, when one has been set.
+///
+/// The avatar name is the handle that appears in every message marker and is
+/// stable; this is display-only and never enters the document format.
+pub fn display_name_of(avatars: &Value, name: &str) -> Option<String> {
+    avatars
+        .get(META_KEY)?
+        .get(name)?
+        .get("name")?
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.to_string())
+}
+
 /// True for keys that are not avatar names.
 pub fn is_reserved_key(key: &str) -> bool {
     key == "main" || key == META_KEY

@@ -5,7 +5,8 @@ use std::path::Path;
 
 use crate::avatars::emojis::pick_emoji;
 use crate::avatars::{
-    get_random_emoji_for_name, kind_of, load_avatars, role_of, save_avatars, set_meta, MAIN_EMOJI,
+    display_name_of, get_random_emoji_for_name, kind_of, load_avatars, role_of, save_avatars,
+    set_meta, MAIN_EMOJI,
 };
 use crate::commands::utils::input::{ask_string, ask_yes_no, default_yes};
 use crate::renderer::table::render_table;
@@ -178,33 +179,43 @@ fn create_secondary_avatar(avatars: &mut serde_json::Value) {
     );
 }
 
-/// `fur avatar <name> --role "…" --kind ai|human --clear-role`
-pub fn run_avatar_meta(name: &str, role: Option<&str>, kind: Option<&str>, clear_role: bool) {
+/// `fur avatar <handle> --name "…" --role "…" --kind ai|human --clear-role`
+pub fn run_avatar_meta(
+    handle: &str,
+    display_name: Option<&str>,
+    role: Option<&str>,
+    kind: Option<&str>,
+    clear_role: bool,
+) {
     let mut avatars = load_avatars();
 
-    if avatars.get(name).is_none() {
-        let emoji = get_random_emoji_for_name(name);
-        avatars[name] = json!(emoji);
-        println!("[OK] Avatar '{}' created {}", name, emoji);
+    if avatars.get(handle).is_none() {
+        let emoji = get_random_emoji_for_name(handle);
+        avatars[handle] = json!(emoji);
+        println!("[OK] Avatar '{}' created {}", handle, emoji);
+    }
+
+    if let Some(value) = display_name {
+        set_meta(&mut avatars, handle, "name", Some(value));
     }
 
     if clear_role {
-        set_meta(&mut avatars, name, "role", None);
+        set_meta(&mut avatars, handle, "role", None);
     } else if let Some(value) = role {
-        set_meta(&mut avatars, name, "role", Some(value));
+        set_meta(&mut avatars, handle, "role", Some(value));
     }
 
     if let Some(value) = kind {
-        set_meta(&mut avatars, name, "kind", Some(value));
+        set_meta(&mut avatars, handle, "kind", Some(value));
     }
 
     save_avatars(&avatars);
 
-    let shown_role = role_of(&avatars, name).unwrap_or_else(|| "—".to_string());
     println!(
-        "🏷️  {} · {} · {}",
-        name.bright_yellow(),
-        kind_of(&avatars, name),
-        shown_role
+        "🏷️  @{} · {} · {} · {}",
+        handle.bright_yellow(),
+        display_name_of(&avatars, handle).unwrap_or_else(|| "—".to_string()),
+        kind_of(&avatars, handle),
+        role_of(&avatars, handle).unwrap_or_else(|| "—".to_string())
     );
 }

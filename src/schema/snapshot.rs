@@ -269,6 +269,8 @@ fn document_authors(folder: &Path, doc: &FurDocument) -> Vec<Value> {
         .collect();
     names.sort_unstable();
     names.dedup();
+    // Humans first, then AI — a paper lists its authors before its tools.
+    names.sort_by_key(|name| crate::avatars::kind_of(&avatars, name) == "ai");
 
     names
         .into_iter()
@@ -277,6 +279,9 @@ fn document_authors(folder: &Path, doc: &FurDocument) -> Vec<Value> {
                 "name": name,
                 "kind": crate::avatars::kind_of(&avatars, name)
             });
+            if let Some(display) = crate::avatars::display_name_of(&avatars, name) {
+                entry["display_name"] = json!(display);
+            }
             if let Some(role) = crate::avatars::role_of(&avatars, name) {
                 entry["role"] = json!(role);
             }

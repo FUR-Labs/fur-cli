@@ -198,8 +198,11 @@ enum Commands {
         action: Option<AvatarAction>,
         #[arg(long)]
         view: bool,
-        /// Avatar to describe (used with --role / --kind / --clear-role)
+        /// Avatar to describe (used with --name / --role / --kind / --clear-role)
         name: Option<String>,
+        /// Human-readable name, e.g. "Pedro Quispe"
+        #[arg(long = "name")]
+        display_name: Option<String>,
         /// Functional role, e.g. "Analista Económico"
         #[arg(long)]
         role: Option<String>,
@@ -425,6 +428,7 @@ fn main() {
         Commands::Avatar {
             action,
             name,
+            display_name,
             role,
             kind,
             clear_role,
@@ -432,10 +436,18 @@ fn main() {
         } => match action {
             Some(AvatarAction::New) => avatar::run_avatar_onboarding(),
             None => match name {
-                // `fur avatar <name> --role …` describes an avatar; bare
-                // `fur avatar` keeps listing them.
-                Some(target) if role.is_some() || kind.is_some() || clear_role => {
-                    avatar::run_avatar_meta(&target, role.as_deref(), kind.as_deref(), clear_role)
+                // `fur avatar <handle> --name/--role/--kind …` describes an
+                // avatar; bare `fur avatar` keeps listing them.
+                Some(target)
+                    if display_name.is_some() || role.is_some() || kind.is_some() || clear_role =>
+                {
+                    avatar::run_avatar_meta(
+                        &target,
+                        display_name.as_deref(),
+                        role.as_deref(),
+                        kind.as_deref(),
+                        clear_role,
+                    )
                 }
                 _ => avatar::run_avatar_view(),
             },
